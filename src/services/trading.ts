@@ -80,6 +80,17 @@ const confidenceFromScore = (score: number) => {
   return 'LOW' as const;
 };
 
+const gradeFromScore = (score: number) => {
+  const absScore = Math.abs(score);
+  if (absScore >= 75) {
+    return 'A' as const;
+  }
+  if (absScore >= 55) {
+    return 'B' as const;
+  }
+  return 'C' as const;
+};
+
 const trendLabel = (ema20: number, ema50: number) => {
   if (ema20 > ema50 * 1.002) {
     return 'BULLISH' as const;
@@ -216,6 +227,7 @@ export const generateSignal = (
 
   score = clamp(score, -100, 100);
   const confidence = confidenceFromScore(score);
+  const grade = gradeFromScore(score);
 
   let type: TradingSignal['type'] = 'HOLD';
   if (score >= 35) {
@@ -245,6 +257,8 @@ export const generateSignal = (
     type,
     confidence,
     score,
+    trend,
+    grade,
     reason: reasons.join(' | '),
     lessonTip,
     entryPrice: currentPrice,

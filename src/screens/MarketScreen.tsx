@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,10 +14,32 @@ import { createTickerStream, fetchKlines, fetchTickers } from '../services/binan
 import type { TickerStreamStatus } from '../services/binance';
 import { calculatePositionSize, generateSignal } from '../services/trading';
 import { useStore } from '../store/useStore';
-import { MarketTicker, TradingSignal } from '../types/trading';
+import { MarketTicker, SignalType, TradingSignal } from '../types/trading';
 import { placeTestnetMarketOrder, validateTestnetOrder } from '../services/binanceTrade';
 
-const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'];
+const SYMBOLS = [
+  'BTCUSDT',
+  'ETHUSDT',
+  'SOLUSDT',
+  'BNBUSDT',
+  'ADAUSDT',
+  'XRPUSDT',
+  'LTCUSDT',
+  'DOGEUSDT',
+  'AVAXUSDT',
+  'DOTUSDT',
+  'LINKUSDT',
+  'MATICUSDT',
+  'TRXUSDT',
+  'BCHUSDT',
+  'SHIBUSDT',
+  'PEPEUSDT',
+  'ATOMUSDT',
+  'NEARUSDT',
+  'SUIUSDT',
+  'INJUSDT',
+  'APTUSDT',
+];
 
 const formatPrice = (value: number) => {
   return value.toLocaleString(undefined, {
@@ -36,6 +58,18 @@ export const MarketScreen = () => {
     toggleFavorite,
     openTrade,
     binanceTestnetEnabled,
+    requireConfirmations,
+    minAlignmentScore,
+    autoPauseVolatility,
+    maxAtrPercent,
+    manualOverrideEnabled,
+    tradeHoursEnabled,
+    tradeStartHour,
+    tradeEndHour,
+    alertOnSignalChange,
+    setRequireConfirmations,
+    setManualOverrideEnabled,
+    canOpenTrade,
   } = useStore((state) => state);
 
   const [tickers, setTickers] = useState<MarketTicker[]>([]);
@@ -45,6 +79,7 @@ export const MarketScreen = () => {
   const [asOf, setAsOf] = useState<number | null>(null);
   const [streamStatus, setStreamStatus] = useState<TickerStreamStatus>('connecting');
   const [placingOrder, setPlacingOrder] = useState(false);
+  const lastSignalRef = useRef<Record<string, { type: SignalType; at: number }>>({});
 
   const balance = mode === 'DEMO' ? demoBalance : realBalance;
 
@@ -59,14 +94,92 @@ export const MarketScreen = () => {
   const loadSignals = async () => {
     const signalRows = await Promise.all(
       SYMBOLS.map(async (symbol) => {
-        const [klines1h, klines4h] = await Promise.all([
+        const [klines15m, klines1h, klines4h] = await Promise.all([
+          fetchKlines(symbol, '15m', 120),
           fetchKlines(symbol, '1h', 120),
           fetchKlines(symbol, '4h', 120),
         ]);
-        return [symbol, generateSignal(symbol, klines1h, { higherTimeframe: klines4h })] as const;
+        const signal1h = generateSignal(symbol, klines1h, { higherTimeframe: klines4h });
+        const signal15m = generateSignal(symbol, klines15m);
+        const signal4h = generateSignal(symbol, klines4h);
+
+        const timeframes = {
+          '15m': {
+            trend: signal15m.trend ?? 'NEUTRAL',
+            score: signal15m.score,
+            rsi: signal15m.metrics?.rsi ?? 50,
+          },
+          '1h': {
+            trend: signal1h.trend ?? 'NEUTRAL',
+            score: signal1h.score,
+            rsi: signal1h.metrics?.rsi ?? 50,
+          },
+          '4h': {
+            trend: signal4h.trend ?? 'NEUTRAL',
+            score: signal4h.score,
+            rsi: signal4h.metrics?.rsi ?? 50,
+          },
+        };
+
+        const alignmentScore =
+          (timeframes['15m'].trend === timeframes['1h'].trend &&
+          timeframes['1h'].trend !== 'NEUTRAL'
+            ? 1
+            : 0) +
+          (timeframes['4h'].trend === timeframes['1h'].trend &&
+          timeframes['1h'].trend !== 'NEUTRAL'
+            ? 1
+            : 0);
+
+        const confirmations = [...(signal1h.confirmations ?? [])];
+        confirmations.push(
+          `15m trend ${timeframes['15m'].trend}`,
+          `4h trend ${timeframes['4h'].trend}`,
+          `Alignment score ${alignmentScore}/2`
+        );
+
+        return [
+          symbol,
+          {
+            ...signal1h,
+            timeframes,
+            alignmentScore,
+            confirmations,
+          } as TradingSignal,
+        ] as const;
       })
     );
-    setSignals(Object.fromEntries(signalRows));
+    const nextSignals = Object.fromEntries(signalRows);
+
+    const now = Date.now();
+    if (alertOnSignalChange) {
+      const cooldownMs = 10 * 60 * 1000;
+      for (const [symbol, signal] of Object.entries(nextSignals)) {
+        if (!signal || signal.type === 'HOLD') {
+          continue;
+        }
+        const last = lastSignalRef.current[symbol];
+        if (!last || (last.type !== signal.type && now - last.at > cooldownMs)) {
+          Alert.alert(
+            'Signal changed',
+            `${symbol.replace('USDT', '')}: ${signal.type} (${signal.confidence})`
+          );
+          break;
+        }
+      }
+    }
+
+    for (const [symbol, signal] of Object.entries(nextSignals)) {
+      if (!signal) {
+        continue;
+      }
+      const last = lastSignalRef.current[symbol];
+      if (!last || last.type !== signal.type) {
+        lastSignalRef.current[symbol] = { type: signal.type, at: now };
+      }
+    }
+
+    setSignals(nextSignals);
   };
 
   const loadInitial = async () => {
@@ -155,6 +268,24 @@ export const MarketScreen = () => {
     });
   }, [tickers, favorites]);
 
+  const heatmapItems = useMemo(() => {
+    return sortedTickers.map((ticker) => {
+      const signal = signals[ticker.symbol];
+      const score = signal?.score ?? 0;
+      const intensity = Math.min(1, Math.abs(score) / 100);
+      const isBull = score >= 30;
+      const isBear = score <= -30;
+      const baseColor = isBull ? '#166534' : isBear ? '#7F1D1D' : '#334155';
+      return {
+        symbol: ticker.symbol,
+        label: ticker.symbol.replace('USDT', ''),
+        score,
+        intensity,
+        baseColor,
+      };
+    });
+  }, [sortedTickers, signals]);
+
   const marketHealth = useMemo(() => {
     const signalList = Object.values(signals);
     if (!signalList.length) {
@@ -210,6 +341,49 @@ export const MarketScreen = () => {
     if (signal.type === 'HOLD') {
       Alert.alert('No trade', 'Signal is neutral. Wait for better conditions.');
       return;
+    }
+
+    if (tradeHoursEnabled) {
+      const hour = new Date().getHours();
+      const inWindow =
+        tradeStartHour <= tradeEndHour
+          ? hour >= tradeStartHour && hour <= tradeEndHour
+          : hour >= tradeStartHour || hour <= tradeEndHour;
+      if (!inWindow) {
+        Alert.alert('Trade blocked', 'Outside your allowed trading hours.');
+        return;
+      }
+    }
+
+    const guard = canOpenTrade(balance);
+    if (!guard.ok) {
+      Alert.alert('Trade blocked', guard.reason ?? 'Risk limits active.');
+      return;
+    }
+
+    if (requireConfirmations && !manualOverrideEnabled) {
+      const alignment = signal.alignmentScore ?? 0;
+      if (alignment < minAlignmentScore) {
+        Alert.alert('Trade blocked', 'Not enough timeframe confirmations.');
+        return;
+      }
+      if (
+        signal.higherTimeframe?.trend &&
+        signal.trend &&
+        signal.higherTimeframe.trend !== 'NEUTRAL' &&
+        signal.higherTimeframe.trend !== signal.trend
+      ) {
+        Alert.alert('Trade blocked', 'Higher timeframe trend conflicts.');
+        return;
+      }
+      if (
+        autoPauseVolatility &&
+        signal.metrics?.atrPercent &&
+        signal.metrics.atrPercent > maxAtrPercent
+      ) {
+        Alert.alert('Trade blocked', 'Volatility is too high right now.');
+        return;
+      }
     }
     const quantity = calculatePositionSize(
       balance,
@@ -320,6 +494,37 @@ export const MarketScreen = () => {
         </Text>
       </View>
 
+      <View style={styles.quickCard}>
+        <Text style={styles.healthTitle}>Quick Controls</Text>
+        <View style={styles.quickRow}>
+          <Pressable
+            style={[
+              styles.quickToggle,
+              requireConfirmations ? styles.quickOn : styles.quickOff,
+            ]}
+            onPress={() => setRequireConfirmations(!requireConfirmations)}
+          >
+            <Text style={styles.quickText}>
+              Confirmations {requireConfirmations ? 'On' : 'Off'}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.quickToggle,
+              manualOverrideEnabled ? styles.quickOn : styles.quickOff,
+            ]}
+            onPress={() => setManualOverrideEnabled(!manualOverrideEnabled)}
+          >
+            <Text style={styles.quickText}>
+              Manual Override {manualOverrideEnabled ? 'On' : 'Off'}
+            </Text>
+          </Pressable>
+        </View>
+        <Text style={styles.quickHint}>
+          Turn confirmations off if trades feel blocked. You can always switch back in Settings.
+        </Text>
+      </View>
+
       {marketHealth ? (
         <View style={styles.healthCard}>
           <View style={styles.rowBetween}>
@@ -357,10 +562,59 @@ export const MarketScreen = () => {
         </View>
       ) : null}
 
+      <View style={styles.radarCard}>
+        <Text style={styles.healthTitle}>Volatility Radar</Text>
+        {sortedTickers
+          .slice()
+          .sort((a, b) => Math.abs(b.priceChangePercent) - Math.abs(a.priceChangePercent))
+          .slice(0, 3)
+          .map((item) => (
+            <View key={item.symbol} style={styles.radarRow}>
+              <Text style={styles.radarSymbol}>{item.symbol.replace('USDT', '')}</Text>
+              <Text
+                style={[
+                  styles.radarChange,
+                  item.priceChangePercent >= 0 ? styles.up : styles.down,
+                ]}
+              >
+                {item.priceChangePercent.toFixed(2)}%
+              </Text>
+            </View>
+          ))}
+      </View>
+
+      <View style={styles.heatmapCard}>
+        <Text style={styles.healthTitle}>Watchlist Heatmap</Text>
+        <View style={styles.heatmapGrid}>
+          {heatmapItems.map((item) => (
+            <View
+              key={item.symbol}
+              style={[
+                styles.heatmapTile,
+                {
+                  backgroundColor: item.baseColor,
+                  opacity: 0.55 + item.intensity * 0.45,
+                },
+              ]}
+            >
+              <Text style={styles.heatmapText}>{item.label}</Text>
+              <Text style={styles.heatmapSub}>{item.score.toFixed(0)}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
       {sortedTickers.map((ticker) => {
         const signal = signals[ticker.symbol];
         const isFav = favorites.includes(ticker.symbol);
         const isUp = ticker.priceChangePercent >= 0;
+        const impact =
+          Math.abs(ticker.priceChangePercent) > 6 ||
+          (signal?.metrics?.atrPercent ?? 0) > 0.03
+            ? 'High'
+            : Math.abs(ticker.priceChangePercent) > 3
+            ? 'Medium'
+            : 'Low';
         const tradeSize =
           signal?.entryPrice && signal?.stopLoss
             ? calculatePositionSize(balance, riskPerTrade, signal.entryPrice, signal.stopLoss)
@@ -408,6 +662,7 @@ export const MarketScreen = () => {
                   >
                     <Text style={styles.signalBadgeText}>
                       {signal.type} - {signal.confidence}
+                      {signal.grade ? ` (${signal.grade})` : ''}
                     </Text>
                   </View>
                 </View>
@@ -416,6 +671,7 @@ export const MarketScreen = () => {
                 {signal.marketSummary ? (
                   <Text style={styles.summaryText}>{signal.marketSummary}</Text>
                 ) : null}
+                <Text style={styles.impactText}>Impact: {impact}</Text>
                 <Text style={styles.tipText}>Learn tip: {signal.lessonTip}</Text>
 
                 <View style={styles.metricsRow}>
@@ -496,6 +752,39 @@ const styles = StyleSheet.create({
   subtitle: {
     color: '#94A3B8',
     marginTop: 4,
+  },
+  quickCard: {
+    backgroundColor: '#111827',
+    borderColor: '#1F2937',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    gap: 10,
+  },
+  quickRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  quickToggle: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  quickOn: {
+    backgroundColor: '#14532D',
+  },
+  quickOff: {
+    backgroundColor: '#7F1D1D',
+  },
+  quickText: {
+    color: '#F8FAFC',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  quickHint: {
+    color: '#94A3B8',
+    fontSize: 12,
   },
   card: {
     backgroundColor: '#111827',
@@ -585,6 +874,10 @@ const styles = StyleSheet.create({
     color: '#93C5FD',
     fontSize: 12,
   },
+  impactText: {
+    color: '#FBBF24',
+    fontSize: 12,
+  },
   tipText: {
     color: '#7DD3FC',
     fontSize: 12,
@@ -613,6 +906,55 @@ const styles = StyleSheet.create({
   confirmationText: {
     color: '#94A3B8',
     fontSize: 11,
+  },
+  heatmapCard: {
+    backgroundColor: '#0F172A',
+    borderColor: '#1F2937',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    gap: 10,
+  },
+  heatmapGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  heatmapTile: {
+    width: '30%',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  heatmapText: {
+    color: '#F8FAFC',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  heatmapSub: {
+    color: '#E2E8F0',
+    fontSize: 11,
+  },
+  radarCard: {
+    backgroundColor: '#0F172A',
+    borderColor: '#1F2937',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    gap: 8,
+  },
+  radarRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  radarSymbol: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  radarChange: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   healthCard: {
     backgroundColor: '#0F172A',

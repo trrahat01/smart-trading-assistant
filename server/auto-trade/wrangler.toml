@@ -1,0 +1,10 @@
+name = "smart-trading-auto-trade"
+main = "src/worker.ts"
+compatibility_date = "2025-01-01"
+
+kv_namespaces = [
+  { binding = "AUTO_TRADE_KV", id = "1a17f557a50541f4a23a650d495769a4" }
+]
+
+[triggers]
+crons = ["*/1 * * * *"]

@@ -1,10 +1,37 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { clearBinanceKeys, getBinanceKeys, saveBinanceKeys } from '../services/binanceKeys';
 import { fetchTestnetAccountInfo } from '../services/binanceTrade';
+import {
+  loadAutoTradeSettings,
+  pushAutoTradeConfig,
+  saveAutoTradeSettings,
+} from '../services/autoTrade';
 import { useStore } from '../store/useStore';
 
-const SYMBOL_PRESETS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'];
+const SYMBOL_PRESETS = [
+  'BTCUSDT',
+  'ETHUSDT',
+  'SOLUSDT',
+  'BNBUSDT',
+  'ADAUSDT',
+  'XRPUSDT',
+  'LTCUSDT',
+  'DOGEUSDT',
+  'AVAXUSDT',
+  'DOTUSDT',
+  'LINKUSDT',
+  'MATICUSDT',
+  'TRXUSDT',
+  'BCHUSDT',
+  'SHIBUSDT',
+  'PEPEUSDT',
+  'ATOMUSDT',
+  'NEARUSDT',
+  'SUIUSDT',
+  'INJUSDT',
+  'APTUSDT',
+];
 
 export const SettingsScreen = () => {
   const {
@@ -12,13 +39,67 @@ export const SettingsScreen = () => {
     riskPerTrade,
     favorites,
     binanceTestnetEnabled,
+    maxDailyLossPct,
+    maxTradesPerDay,
+    lossStreakLimit,
+    cooldownMinutes,
+    requireConfirmations,
+    minAlignmentScore,
+    autoPauseVolatility,
+    maxAtrPercent,
+    manualOverrideEnabled,
+    tradeHoursEnabled,
+    tradeStartHour,
+    tradeEndHour,
+    autoCloseOnStop,
+    autoGradeFilter,
+    alertOnSignalChange,
     setMode,
     setRiskPerTrade,
     toggleFavorite,
     setBinanceTestnetEnabled,
+    setMaxDailyLossPct,
+    setMaxTradesPerDay,
+    setLossStreakLimit,
+    setCooldownMinutes,
+    setRequireConfirmations,
+    setMinAlignmentScore,
+    setAutoPauseVolatility,
+    setMaxAtrPercent,
+    setManualOverrideEnabled,
+    setTradeHoursEnabled,
+    setTradeStartHour,
+    setTradeEndHour,
+    setAutoCloseOnStop,
+    setAutoGradeFilter,
+    setAlertOnSignalChange,
     resetDemo,
     resetLearning,
   } = useStore((state) => state);
+
+  const applyEasyMode = () => {
+    setRequireConfirmations(false);
+    setMinAlignmentScore(0);
+    setAutoPauseVolatility(false);
+    setMaxAtrPercent(0.05);
+    setManualOverrideEnabled(true);
+    setMaxTradesPerDay(8);
+    setMaxDailyLossPct(6);
+    setLossStreakLimit(3);
+    setCooldownMinutes(30);
+  };
+
+  const applySafeMode = () => {
+    setRequireConfirmations(true);
+    setMinAlignmentScore(2);
+    setAutoPauseVolatility(true);
+    setMaxAtrPercent(0.03);
+    setManualOverrideEnabled(false);
+    setMaxTradesPerDay(3);
+    setMaxDailyLossPct(3);
+    setLossStreakLimit(2);
+    setCooldownMinutes(90);
+  };
 
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
@@ -27,6 +108,16 @@ export const SettingsScreen = () => {
   const [balanceLabel, setBalanceLabel] = useState('Not loaded');
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [balanceUpdatedAt, setBalanceUpdatedAt] = useState<number | null>(null);
+  const [autoServerUrl, setAutoServerUrl] = useState('');
+  const [autoToken, setAutoToken] = useState('');
+  const [autoDeviceId, setAutoDeviceId] = useState('');
+  const [autoEnabled, setAutoEnabled] = useState(false);
+  const [autoSyncing, setAutoSyncing] = useState(false);
+  const [autoSyncedAt, setAutoSyncedAt] = useState<number | null>(null);
+  const [autoTesting, setAutoTesting] = useState(false);
+  const [autoHealth, setAutoHealth] = useState<'unknown' | 'ok' | 'fail'>('unknown');
+  const [autoLogs, setAutoLogs] = useState<string[]>([]);
+  const [autoLogLoading, setAutoLogLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -42,6 +133,24 @@ export const SettingsScreen = () => {
       }
     };
     loadKeys();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const loadSettings = async () => {
+      const settings = await loadAutoTradeSettings();
+      if (!active) {
+        return;
+      }
+      setAutoServerUrl(settings.serverUrl);
+      setAutoToken(settings.token);
+      setAutoDeviceId(settings.deviceId);
+      setAutoEnabled(settings.enabled);
+    };
+    loadSettings();
     return () => {
       active = false;
     };
@@ -97,6 +206,108 @@ export const SettingsScreen = () => {
       clearInterval(timer);
     };
   }, [handleRefreshBalance, keysSaved]);
+
+  const autoSymbols = useMemo(() => {
+    const base = favorites.length ? favorites : SYMBOL_PRESETS;
+    return base;
+  }, [favorites]);
+
+  const syncAutoTrade = async (enabled: boolean) => {
+    if (!apiKey.trim() || !apiSecret.trim()) {
+      Alert.alert('Missing keys', 'Save your testnet keys first.');
+      return;
+    }
+    if (!autoServerUrl.trim() || !autoToken.trim()) {
+      Alert.alert('Missing server info', 'Enter the server URL and token first.');
+      return;
+    }
+
+    setAutoSyncing(true);
+    try {
+      const settings = {
+        serverUrl: autoServerUrl,
+        token: autoToken,
+        deviceId: autoDeviceId,
+        enabled,
+      };
+      await saveAutoTradeSettings(settings);
+      await pushAutoTradeConfig(settings, {
+        enabled,
+        symbols: autoSymbols,
+        riskPerTrade,
+        maxTradesPerDay,
+        minAlignmentScore,
+        requireConfirmations,
+        autoPauseVolatility,
+        maxAtrPercent,
+        tradeHoursEnabled,
+        tradeStartHour,
+        tradeEndHour,
+        utcOffsetMinutes: new Date().getTimezoneOffset(),
+        autoGradeFilter,
+        mode: 'TESTNET',
+        apiKey: apiKey.trim(),
+        apiSecret: apiSecret.trim(),
+      });
+      setAutoEnabled(enabled);
+      setAutoSyncedAt(Date.now());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Auto-trade update failed.';
+      Alert.alert('Auto-trade failed', message);
+    } finally {
+      setAutoSyncing(false);
+    }
+  };
+
+  const testAutoTrade = async () => {
+    if (!autoServerUrl.trim()) {
+      Alert.alert('Missing server URL', 'Enter the server URL first.');
+      return;
+    }
+    setAutoTesting(true);
+    try {
+      const response = await fetch(`${autoServerUrl.replace(/\/$/, '')}/health`);
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean };
+      if (response.ok && data.ok) {
+        setAutoHealth('ok');
+        Alert.alert('Server OK', 'Auto-trade server is reachable.');
+      } else {
+        setAutoHealth('fail');
+        Alert.alert('Server failed', 'Server responded but did not return OK.');
+      }
+    } catch (error) {
+      setAutoHealth('fail');
+      Alert.alert('Server failed', 'Could not reach the auto-trade server.');
+    } finally {
+      setAutoTesting(false);
+    }
+  };
+
+  const fetchAutoLogs = async () => {
+    if (!autoServerUrl.trim() || !autoToken.trim()) {
+      Alert.alert('Missing server info', 'Enter the server URL and token first.');
+      return;
+    }
+    setAutoLogLoading(true);
+    try {
+      const response = await fetch(
+        `${autoServerUrl.replace(/\/$/, '')}/logs?deviceId=${encodeURIComponent(autoDeviceId)}`,
+        {
+          headers: { Authorization: `Bearer ${autoToken}` },
+        }
+      );
+      const data = (await response.json().catch(() => ({}))) as { logs?: string[] };
+      if (!response.ok) {
+        Alert.alert('Logs failed', 'Could not load server logs.');
+        return;
+      }
+      setAutoLogs(Array.isArray(data.logs) ? data.logs : []);
+    } catch (error) {
+      Alert.alert('Logs failed', 'Could not reach the auto-trade server.');
+    } finally {
+      setAutoLogLoading(false);
+    }
+  };
 
   const handleSaveKeys = async () => {
     if (!apiKey.trim() || !apiSecret.trim()) {
@@ -185,6 +396,284 @@ export const SettingsScreen = () => {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Risk Controls Pro</Text>
+        <Text style={styles.sectionDescription}>Limits to reduce losses and protect capital.</Text>
+
+        <View style={styles.riskRow}>
+          <Text style={styles.riskLabel}>Max daily loss</Text>
+          <View style={styles.riskControlsInline}>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setMaxDailyLossPct(maxDailyLossPct - 1)}
+            >
+              <Text style={styles.riskButtonText}>-</Text>
+            </Pressable>
+            <Text style={styles.riskValueSmall}>{maxDailyLossPct}%</Text>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setMaxDailyLossPct(maxDailyLossPct + 1)}
+            >
+              <Text style={styles.riskButtonText}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.riskRow}>
+          <Text style={styles.riskLabel}>Max trades/day</Text>
+          <View style={styles.riskControlsInline}>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setMaxTradesPerDay(maxTradesPerDay - 1)}
+            >
+              <Text style={styles.riskButtonText}>-</Text>
+            </Pressable>
+            <Text style={styles.riskValueSmall}>{maxTradesPerDay}</Text>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setMaxTradesPerDay(maxTradesPerDay + 1)}
+            >
+              <Text style={styles.riskButtonText}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.riskRow}>
+          <Text style={styles.riskLabel}>Loss streak limit</Text>
+          <View style={styles.riskControlsInline}>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setLossStreakLimit(lossStreakLimit - 1)}
+            >
+              <Text style={styles.riskButtonText}>-</Text>
+            </Pressable>
+            <Text style={styles.riskValueSmall}>{lossStreakLimit}</Text>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setLossStreakLimit(lossStreakLimit + 1)}
+            >
+              <Text style={styles.riskButtonText}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.riskRow}>
+          <Text style={styles.riskLabel}>Cooldown (minutes)</Text>
+          <View style={styles.riskControlsInline}>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setCooldownMinutes(cooldownMinutes - 5)}
+            >
+              <Text style={styles.riskButtonText}>-</Text>
+            </Pressable>
+            <Text style={styles.riskValueSmall}>{cooldownMinutes}</Text>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setCooldownMinutes(cooldownMinutes + 5)}
+            >
+              <Text style={styles.riskButtonText}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Mode Presets</Text>
+        <Text style={styles.sectionDescription}>
+          Quick presets to make trading easier or safer.
+        </Text>
+        <Pressable style={styles.applyButton} onPress={applyEasyMode}>
+          <Text style={styles.applyButtonText}>Easy Mode (Faster)</Text>
+        </Pressable>
+        <Pressable style={styles.safeButton} onPress={applySafeMode}>
+          <Text style={styles.applyButtonText}>Safe Mode (Stricter)</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Confirmations & Alerts</Text>
+        <Text style={styles.sectionDescription}>Extra filters before trades are allowed.</Text>
+
+        <Pressable
+          style={[
+            styles.toggleButton,
+            requireConfirmations ? styles.toggleOn : styles.toggleOff,
+          ]}
+          onPress={() => setRequireConfirmations(!requireConfirmations)}
+        >
+          <Text style={styles.toggleText}>
+            {requireConfirmations ? 'Confirmations Enabled' : 'Confirmations Disabled'}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={[
+            styles.toggleButton,
+            manualOverrideEnabled ? styles.toggleOn : styles.toggleOff,
+          ]}
+          onPress={() => setManualOverrideEnabled(!manualOverrideEnabled)}
+        >
+          <Text style={styles.toggleText}>
+            {manualOverrideEnabled ? 'Manual Override Enabled' : 'Manual Override Disabled'}
+          </Text>
+        </Pressable>
+
+        <View style={styles.riskRow}>
+          <Text style={styles.riskLabel}>Min alignment</Text>
+          <View style={styles.riskControlsInline}>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setMinAlignmentScore(minAlignmentScore - 1)}
+            >
+              <Text style={styles.riskButtonText}>-</Text>
+            </Pressable>
+            <Text style={styles.riskValueSmall}>{minAlignmentScore}/2</Text>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setMinAlignmentScore(minAlignmentScore + 1)}
+            >
+              <Text style={styles.riskButtonText}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <Pressable
+          style={[
+            styles.toggleButton,
+            autoPauseVolatility ? styles.toggleOn : styles.toggleOff,
+          ]}
+          onPress={() => setAutoPauseVolatility(!autoPauseVolatility)}
+        >
+          <Text style={styles.toggleText}>
+            {autoPauseVolatility ? 'Pause On High Volatility' : 'No Volatility Pause'}
+          </Text>
+        </Pressable>
+
+        <View style={styles.riskRow}>
+          <Text style={styles.riskLabel}>Max ATR%</Text>
+          <View style={styles.riskControlsInline}>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setMaxAtrPercent(Number((maxAtrPercent - 0.005).toFixed(3)))}
+            >
+              <Text style={styles.riskButtonText}>-</Text>
+            </Pressable>
+            <Text style={styles.riskValueSmall}>{(maxAtrPercent * 100).toFixed(1)}%</Text>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setMaxAtrPercent(Number((maxAtrPercent + 0.005).toFixed(3)))}
+            >
+              <Text style={styles.riskButtonText}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <Pressable
+          style={[
+            styles.toggleButton,
+            alertOnSignalChange ? styles.toggleOn : styles.toggleOff,
+          ]}
+          onPress={() => setAlertOnSignalChange(!alertOnSignalChange)}
+        >
+          <Text style={styles.toggleText}>
+            {alertOnSignalChange ? 'Signal Alerts On' : 'Signal Alerts Off'}
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Auto Trade Grade Filter</Text>
+        <Text style={styles.sectionDescription}>
+          Auto trade only when signal grade meets the filter.
+        </Text>
+        <View style={styles.directionRow}>
+          {(['ALL', 'A', 'B', 'C'] as const).map((grade) => (
+            <Pressable
+              key={grade}
+              style={[
+                styles.directionButton,
+                autoGradeFilter === grade && styles.buyButton,
+              ]}
+              onPress={() => setAutoGradeFilter(grade)}
+            >
+              <Text style={styles.directionText}>{grade}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Trading Hours</Text>
+        <Text style={styles.sectionDescription}>
+          Allow trades only within a time window (local time).
+        </Text>
+        <Pressable
+          style={[
+            styles.toggleButton,
+            tradeHoursEnabled ? styles.toggleOn : styles.toggleOff,
+          ]}
+          onPress={() => setTradeHoursEnabled(!tradeHoursEnabled)}
+        >
+          <Text style={styles.toggleText}>
+            {tradeHoursEnabled ? 'Trading Hours Enabled' : 'Trading Hours Disabled'}
+          </Text>
+        </Pressable>
+        <View style={styles.riskRow}>
+          <Text style={styles.riskLabel}>Start hour</Text>
+          <View style={styles.riskControlsInline}>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setTradeStartHour(tradeStartHour - 1)}
+            >
+              <Text style={styles.riskButtonText}>-</Text>
+            </Pressable>
+            <Text style={styles.riskValueSmall}>{tradeStartHour}:00</Text>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setTradeStartHour(tradeStartHour + 1)}
+            >
+              <Text style={styles.riskButtonText}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+        <View style={styles.riskRow}>
+          <Text style={styles.riskLabel}>End hour</Text>
+          <View style={styles.riskControlsInline}>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setTradeEndHour(tradeEndHour - 1)}
+            >
+              <Text style={styles.riskButtonText}>-</Text>
+            </Pressable>
+            <Text style={styles.riskValueSmall}>{tradeEndHour}:00</Text>
+            <Pressable
+              style={styles.riskButtonSmall}
+              onPress={() => setTradeEndHour(tradeEndHour + 1)}
+            >
+              <Text style={styles.riskButtonText}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Auto Close</Text>
+        <Text style={styles.sectionDescription}>
+          Automatically close trades when stop loss is hit (while app is open).
+        </Text>
+        <Pressable
+          style={[
+            styles.toggleButton,
+            autoCloseOnStop ? styles.toggleOn : styles.toggleOff,
+          ]}
+          onPress={() => setAutoCloseOnStop(!autoCloseOnStop)}
+        >
+          <Text style={styles.toggleText}>
+            {autoCloseOnStop ? 'Auto Close On' : 'Auto Close Off'}
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Favorite Markets</Text>
         <Text style={styles.sectionDescription}>
           Pin the pairs you want to watch first in the Market tab.
@@ -256,7 +745,9 @@ export const SettingsScreen = () => {
             styles.refreshButton,
             loadingBalance ? styles.buttonDisabled : styles.buttonGhost,
           ]}
-          onPress={handleRefreshBalance}
+          onPress={() => {
+            handleRefreshBalance();
+          }}
           disabled={loadingBalance}
         >
           <Text style={styles.actionButtonText}>
@@ -286,6 +777,114 @@ export const SettingsScreen = () => {
           Status: {keysSaved ? 'Keys saved' : 'Keys missing'} | Trading{' '}
           {binanceTestnetEnabled ? 'On' : 'Off'}
         </Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Auto Trade (Server)</Text>
+        <Text style={styles.sectionDescription}>
+          Runs on a free server so it keeps trading even when your phone is closed. Testnet only.
+        </Text>
+
+        <TextInput
+          value={autoServerUrl}
+          onChangeText={setAutoServerUrl}
+          placeholder="Server URL (https://your-worker.example)"
+          placeholderTextColor="#64748B"
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.input}
+        />
+        <TextInput
+          value={autoToken}
+          onChangeText={setAutoToken}
+          placeholder="Server Token"
+          placeholderTextColor="#64748B"
+          autoCapitalize="none"
+          autoCorrect={false}
+          secureTextEntry
+          style={styles.input}
+        />
+        <Text style={styles.deviceIdText}>Device ID: {autoDeviceId}</Text>
+
+        <Pressable
+          style={[
+            styles.refreshButton,
+            autoSyncing ? styles.buttonDisabled : styles.buttonGhost,
+          ]}
+          onPress={() => syncAutoTrade(autoEnabled)}
+          disabled={autoSyncing}
+        >
+          <Text style={styles.actionButtonText}>
+            {autoSyncing ? 'Syncing...' : 'Sync Settings'}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={[
+            styles.refreshButton,
+            autoTesting ? styles.buttonDisabled : styles.buttonGhost,
+          ]}
+          onPress={testAutoTrade}
+          disabled={autoTesting}
+        >
+          <Text style={styles.actionButtonText}>
+            {autoTesting
+              ? 'Testing...'
+              : autoHealth === 'ok'
+              ? 'Test Connection (OK)'
+              : autoHealth === 'fail'
+              ? 'Test Connection (Failed)'
+              : 'Test Connection'}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={[
+            styles.toggleButton,
+            autoEnabled ? styles.toggleOn : styles.toggleOff,
+            autoSyncing && styles.buttonDisabled,
+          ]}
+          onPress={() => syncAutoTrade(!autoEnabled)}
+          disabled={autoSyncing}
+        >
+          <Text style={styles.toggleText}>
+            {autoSyncing
+              ? 'Syncing...'
+              : autoEnabled
+              ? 'Disable Auto Trade'
+              : 'Enable Auto Trade'}
+          </Text>
+        </Pressable>
+        <Text style={styles.helperText}>
+          Status: {autoEnabled ? 'On' : 'Off'} | Symbols: {autoSymbols.length}
+        </Text>
+        <Text style={styles.balanceMeta}>
+          {autoSyncedAt
+            ? `Last sync ${new Date(autoSyncedAt).toLocaleTimeString()}`
+            : 'Last sync: not yet'}
+        </Text>
+
+        <Pressable
+          style={[
+            styles.refreshButton,
+            autoLogLoading ? styles.buttonDisabled : styles.buttonGhost,
+          ]}
+          onPress={fetchAutoLogs}
+          disabled={autoLogLoading}
+        >
+          <Text style={styles.actionButtonText}>
+            {autoLogLoading ? 'Loading logs...' : 'Fetch Server Logs'}
+          </Text>
+        </Pressable>
+        {autoLogs.length ? (
+          <View style={styles.logsBox}>
+            {autoLogs.slice(0, 6).map((log, index) => (
+              <Text key={`${log}-${index}`} style={styles.logText}>
+                {log}
+              </Text>
+            ))}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.section}>
@@ -385,10 +984,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
   },
+  riskRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  riskLabel: {
+    color: '#CBD5E1',
+    fontSize: 13,
+  },
+  riskControlsInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   riskButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
+    backgroundColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  riskButtonSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#334155',
     alignItems: 'center',
     justifyContent: 'center',
@@ -403,6 +1024,13 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '700',
     minWidth: 70,
+    textAlign: 'center',
+  },
+  riskValueSmall: {
+    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '700',
+    minWidth: 40,
     textAlign: 'center',
   },
   helperText: {
@@ -436,6 +1064,22 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontSize: 11,
     textAlign: 'center',
+  },
+  deviceIdText: {
+    color: '#94A3B8',
+    fontSize: 11,
+  },
+  logsBox: {
+    backgroundColor: '#0F172A',
+    borderColor: '#1F2937',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 8,
+    gap: 4,
+  },
+  logText: {
+    color: '#94A3B8',
+    fontSize: 11,
   },
   actionButton: {
     flex: 1,
@@ -506,6 +1150,43 @@ const styles = StyleSheet.create({
   resetButtonText: {
     color: '#F8FAFC',
     fontWeight: '700',
+  },
+  applyButton: {
+    backgroundColor: '#1D4ED8',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  safeButton: {
+    backgroundColor: '#0F766E',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    color: '#F8FAFC',
+    fontWeight: '700',
+  },
+  directionRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  directionButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#334155',
+    alignItems: 'center',
+  },
+  directionText: {
+    color: '#F8FAFC',
+    fontWeight: '700',
+  },
+  buyButton: {
+    backgroundColor: '#14532D',
+  },
+  sellButton: {
+    backgroundColor: '#7F1D1D',
   },
   footerText: {
     textAlign: 'center',

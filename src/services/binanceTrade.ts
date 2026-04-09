@@ -3,8 +3,10 @@ import Hex from 'crypto-js/enc-hex';
 import { getBinanceKeys } from './binanceKeys';
 
 const DEFAULT_TESTNET_BASE_URL = 'https://testnet.binance.vision/api';
+const runtimeEnv =
+  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
 const TESTNET_BASE_URL =
-  process.env.EXPO_PUBLIC_BINANCE_TESTNET_API_URL ?? DEFAULT_TESTNET_BASE_URL;
+  runtimeEnv.EXPO_PUBLIC_BINANCE_TESTNET_API_URL ?? DEFAULT_TESTNET_BASE_URL;
 
 export interface BinanceOrderResponse {
   orderId?: number;
@@ -118,7 +120,7 @@ export const fetchTestnetAccountInfo = async (): Promise<BinanceAccountInfo> => 
     );
   }
 
-  return data as BinanceAccountInfo;
+  return data as unknown as BinanceAccountInfo;
 };
 
 export const fetchTestnetSymbolRules = async (symbol: string): Promise<SymbolTradingRules> => {

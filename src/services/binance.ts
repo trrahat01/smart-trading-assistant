@@ -10,6 +10,21 @@ const FALLBACK_BASE_PRICE: Record<string, number> = {
   BNBUSDT: 610,
   ADAUSDT: 0.82,
   XRPUSDT: 0.62,
+  LTCUSDT: 95,
+  DOGEUSDT: 0.16,
+  AVAXUSDT: 42,
+  DOTUSDT: 7.5,
+  LINKUSDT: 16,
+  MATICUSDT: 0.95,
+  TRXUSDT: 0.14,
+  BCHUSDT: 390,
+  SHIBUSDT: 0.00002,
+  PEPEUSDT: 0.0000012,
+  ATOMUSDT: 9.5,
+  NEARUSDT: 5.2,
+  SUIUSDT: 1.6,
+  INJUSDT: 27,
+  APTUSDT: 10,
 };
 
 const toNumber = (value: unknown, fallback = 0): number => {

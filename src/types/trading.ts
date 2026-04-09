@@ -26,6 +26,8 @@ export interface TradingSignal {
   type: SignalType;
   confidence: Confidence;
   score: number;
+  trend?: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  grade?: 'A' | 'B' | 'C';
   reason: string;
   lessonTip: string;
   entryPrice: number;
@@ -34,6 +36,11 @@ export interface TradingSignal {
   riskReward: number;
   confirmations?: string[];
   marketSummary?: string;
+  timeframes?: Record<
+    string,
+    { trend: 'BULLISH' | 'BEARISH' | 'NEUTRAL'; score: number; rsi: number }
+  >;
+  alignmentScore?: number;
   metrics?: {
     rsi: number;
     ema20: number;

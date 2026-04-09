@@ -4,6 +4,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -22,7 +23,15 @@ const money = (value: number) => {
 };
 
 export const PortfolioScreen = () => {
-  const { mode, demoBalance, realBalance, trades, closeTrade } = useStore((state) => state);
+  const {
+    mode,
+    demoBalance,
+    realBalance,
+    trades,
+    closeTrade,
+    dailyStatsByMode,
+    autoCloseOnStop,
+  } = useStore((state) => state);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [streamStatus, setStreamStatus] = useState<TickerStreamStatus>('offline');
@@ -74,6 +83,18 @@ export const PortfolioScreen = () => {
           ...current,
           [ticker.symbol]: ticker.lastPrice,
         }));
+        if (autoCloseOnStop) {
+          const trade = activeTrades.find((item) => item.symbol === ticker.symbol);
+          if (trade && trade.status === 'OPEN') {
+            const hit =
+              trade.direction === 'BUY'
+                ? ticker.lastPrice <= trade.stopLoss
+                : ticker.lastPrice >= trade.stopLoss;
+            if (hit) {
+              closeTrade(trade.id, ticker.lastPrice);
+            }
+          }
+        }
       },
       onStatus: (status) => {
         if (!active) {
@@ -90,7 +111,7 @@ export const PortfolioScreen = () => {
       active = false;
       stream.close();
     };
-  }, [activeSymbols.join('|')]);
+  }, [activeSymbols.join('|'), autoCloseOnStop, activeTrades, closeTrade]);
 
   const openPnl = useMemo(() => {
     return activeTrades.reduce((sum, trade) => {
@@ -104,6 +125,21 @@ export const PortfolioScreen = () => {
   const winRate = closedTrades.length ? (wins / closedTrades.length) * 100 : 0;
 
   const equity = cashBalance + openPnl;
+  const stats = dailyStatsByMode[mode];
+  const equitySeries = useMemo(() => {
+    const sorted = [...trades]
+      .filter((trade) => trade.mode === mode)
+      .sort((a, b) => a.openedAt - b.openedAt);
+    let running = mode === 'DEMO' ? demoBalance : realBalance;
+    const points: number[] = [];
+    for (const trade of sorted) {
+      if (trade.status === 'CLOSED' && typeof trade.pnl === 'number') {
+        running += trade.pnl;
+        points.push(running);
+      }
+    }
+    return points.slice(-40);
+  }, [trades, mode, demoBalance, realBalance]);
 
   const handleCloseTrade = (trade: Trade) => {
     const price = prices[trade.symbol] ?? trade.entryPrice;
@@ -119,6 +155,47 @@ export const PortfolioScreen = () => {
         },
       ]
     );
+  };
+
+  const exportTrades = async () => {
+    const headers = [
+      'id',
+      'symbol',
+      'direction',
+      'entryPrice',
+      'quantity',
+      'stopLoss',
+      'takeProfit',
+      'openedAt',
+      'status',
+      'closePrice',
+      'closedAt',
+      'pnl',
+      'mode',
+    ];
+    const rows = trades.map((trade) => [
+      trade.id,
+      trade.symbol,
+      trade.direction,
+      trade.entryPrice,
+      trade.quantity,
+      trade.stopLoss,
+      trade.takeProfit,
+      new Date(trade.openedAt).toISOString(),
+      trade.status,
+      trade.closePrice ?? '',
+      trade.closedAt ? new Date(trade.closedAt).toISOString() : '',
+      trade.pnl ?? '',
+      trade.mode,
+    ]);
+
+    const csv = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+    try {
+      await Share.share({ message: csv, title: 'Trade Journal CSV' });
+    } catch (error) {
+      console.warn('CSV share failed', error);
+      Alert.alert('Export failed', 'Could not share the CSV file.');
+    }
   };
 
   return (
@@ -143,6 +220,50 @@ export const PortfolioScreen = () => {
             : 'Live prices offline'}
         </Text>
         <Text style={styles.summaryValue}>${money(equity)}</Text>
+
+        {equitySeries.length ? (
+          <View style={styles.equityChart}>
+            {equitySeries.map((value, index) => {
+              const min = Math.min(...equitySeries);
+              const max = Math.max(...equitySeries);
+              const range = max - min || 1;
+              const heightPct = ((value - min) / range) * 100;
+              return (
+                <View
+                  key={`${value}-${index}`}
+                  style={[styles.equityBar, { height: `${heightPct}%` }]}
+                />
+              );
+            })}
+          </View>
+        ) : null}
+
+        <View style={styles.dailyStatsRow}>
+          <View style={styles.metricItem}>
+            <Text style={styles.metricLabel}>Today PnL</Text>
+            <Text style={[styles.metricValue, stats.pnl >= 0 ? styles.positive : styles.negative]}>
+              {stats.pnl >= 0 ? '+' : ''}${money(stats.pnl)}
+            </Text>
+          </View>
+          <View style={styles.metricItem}>
+            <Text style={styles.metricLabel}>Trades Today</Text>
+            <Text style={styles.metricValue}>{stats.tradesCount}</Text>
+          </View>
+        </View>
+        <View style={styles.dailyStatsRow}>
+          <View style={styles.metricItem}>
+            <Text style={styles.metricLabel}>Loss Streak</Text>
+            <Text style={styles.metricValue}>{stats.lossStreak}</Text>
+          </View>
+          <View style={styles.metricItem}>
+            <Text style={styles.metricLabel}>Cooldown</Text>
+            <Text style={styles.metricValue}>
+              {stats.cooldownUntil && stats.cooldownUntil > Date.now()
+                ? new Date(stats.cooldownUntil).toLocaleTimeString()
+                : 'None'}
+            </Text>
+          </View>
+        </View>
 
         <View style={styles.metricsGrid}>
           <View style={styles.metricItem}>
@@ -208,6 +329,9 @@ export const PortfolioScreen = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Recent History</Text>
+        <Pressable style={styles.exportButton} onPress={exportTrades}>
+          <Text style={styles.exportButtonText}>Export Trades CSV</Text>
+        </Pressable>
         {closedTrades.length === 0 ? (
           <Text style={styles.emptyText}>No closed trades yet.</Text>
         ) : (
@@ -274,6 +398,23 @@ const styles = StyleSheet.create({
   metricsGrid: {
     marginTop: 14,
     gap: 10,
+  },
+  dailyStatsRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  equityChart: {
+    marginTop: 12,
+    height: 90,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  equityBar: {
+    flex: 1,
+    backgroundColor: '#22C55E',
+    borderRadius: 4,
   },
   metricItem: {
     flexDirection: 'row',
@@ -347,6 +488,17 @@ const styles = StyleSheet.create({
     color: '#E2E8F0',
     fontSize: 13,
     fontWeight: '700',
+  },
+  exportButton: {
+    backgroundColor: '#1D4ED8',
+    borderRadius: 10,
+    paddingVertical: 9,
+    alignItems: 'center',
+  },
+  exportButtonText: {
+    color: '#F8FAFC',
+    fontWeight: '700',
+    fontSize: 13,
   },
   historyRow: {
     flexDirection: 'row',

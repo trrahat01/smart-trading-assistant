@@ -6,14 +6,14 @@ import { NavigationContainer, DarkTheme, Theme } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MarketScreen } from './src/screens/MarketScreen';
 import { PortfolioScreen } from './src/screens/PortfolioScreen';
-import { LearnScreen } from './src/screens/LearnScreen';
+import { LiveScreen } from './src/screens/LiveScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { useStore } from './src/store/useStore';
 
 type TabParamList = {
   Market: undefined;
   Portfolio: undefined;
-  Learn: undefined;
+  Live: undefined;
   Settings: undefined;
 };
 
@@ -67,7 +67,7 @@ export default function App() {
             const iconMap: Record<keyof TabParamList, keyof typeof Ionicons.glyphMap> = {
               Market: focused ? 'trending-up' : 'trending-up-outline',
               Portfolio: focused ? 'wallet' : 'wallet-outline',
-              Learn: focused ? 'school' : 'school-outline',
+              Live: focused ? 'pulse' : 'pulse-outline',
               Settings: focused ? 'settings' : 'settings-outline',
             };
             const iconName = iconMap[route.name as keyof TabParamList];
@@ -77,7 +77,7 @@ export default function App() {
       >
         <Tab.Screen name="Market" component={MarketScreen} />
         <Tab.Screen name="Portfolio" component={PortfolioScreen} />
-        <Tab.Screen name="Learn" component={LearnScreen} />
+        <Tab.Screen name="Live" component={LiveScreen} />
         <Tab.Screen name="Settings" component={SettingsScreen} />
       </Tab.Navigator>
     </NavigationContainer>
