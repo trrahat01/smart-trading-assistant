@@ -804,7 +804,12 @@ export const SettingsScreen = () => {
           secureTextEntry
           style={styles.input}
         />
-        <Text style={styles.deviceIdText}>Device ID: {autoDeviceId}</Text>
+        <View style={styles.deviceIdBox}>
+          <Text style={styles.deviceIdLabel}>Device ID</Text>
+          <Text style={styles.deviceIdValue} selectable>
+            {autoDeviceId}
+          </Text>
+        </View>
 
         <Pressable
           style={[
@@ -935,7 +940,7 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 14,
-    paddingBottom: 30,
+    paddingBottom: 110,
   },
   section: {
     backgroundColor: '#111827',
@@ -1056,8 +1061,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   refreshButton: {
+    backgroundColor: '#334155',
     borderRadius: 10,
     paddingVertical: 10,
+    minHeight: 44,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   balanceMeta: {
@@ -1065,9 +1073,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
   },
-  deviceIdText: {
+  deviceIdBox: {
+    backgroundColor: '#0F172A',
+    borderColor: '#1F2937',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 4,
+  },
+  deviceIdLabel: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  deviceIdValue: {
     color: '#94A3B8',
     fontSize: 11,
+    lineHeight: 16,
   },
   logsBox: {
     backgroundColor: '#0F172A',
@@ -1080,6 +1103,7 @@ const styles = StyleSheet.create({
   logText: {
     color: '#94A3B8',
     fontSize: 11,
+    lineHeight: 16,
   },
   actionButton: {
     flex: 1,

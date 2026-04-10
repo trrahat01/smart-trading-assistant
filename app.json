@@ -6,6 +6,11 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1020"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -23,12 +28,22 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B1020",
+          "image": "./assets/icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain"
+        }
+      ]
     ],
     "extra": {
       "eas": {
-        "projectId": "6f9686a0-a09c-43d2-98dc-dbb395a1fe90"
+        "projectId": "03947a5d-c1af-447f-a602-e175d5fd9673"
       }
-    }
+    },
+    "owner": "trrahat"
   }
 }
