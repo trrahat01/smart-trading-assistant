@@ -36,6 +36,7 @@ const SYMBOL_PRESETS = [
 export const SettingsScreen = () => {
   const {
     mode,
+    easyModeEnabled,
     riskPerTrade,
     favorites,
     binanceTestnetEnabled,
@@ -55,6 +56,7 @@ export const SettingsScreen = () => {
     autoGradeFilter,
     alertOnSignalChange,
     setMode,
+    setEasyModeEnabled,
     setRiskPerTrade,
     toggleFavorite,
     setBinanceTestnetEnabled,
@@ -87,6 +89,14 @@ export const SettingsScreen = () => {
     setMaxDailyLossPct(6);
     setLossStreakLimit(3);
     setCooldownMinutes(30);
+  };
+
+  const toggleEasyMode = () => {
+    const next = !easyModeEnabled;
+    setEasyModeEnabled(next);
+    if (next) {
+      applyEasyMode();
+    }
   };
 
   const applySafeMode = () => {
@@ -351,9 +361,23 @@ export const SettingsScreen = () => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Easy Mode</Text>
+        <Text style={styles.sectionDescription}>
+          Show simple controls only. Turn this off to see advanced options.
+        </Text>
+        <Pressable
+          style={[styles.toggleButton, easyModeEnabled ? styles.toggleOn : styles.toggleOff]}
+          onPress={toggleEasyMode}
+        >
+          <Text style={styles.toggleText}>{easyModeEnabled ? 'Easy Mode On' : 'Easy Mode Off'}</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Trading Mode</Text>
         <Text style={styles.sectionDescription}>
-          Use DEMO for practice. REAL mode tracks a separate balance.
+          DEMO and REAL use the same trade flow with Binance-style fees. DEMO starts with $40 so
+          you can practice safely.
         </Text>
 
         <View style={styles.modeRow}>
@@ -395,7 +419,7 @@ export const SettingsScreen = () => {
         <Text style={styles.helperText}>Recommended range: 1% to 2% while learning.</Text>
       </View>
 
-      <View style={styles.section}>
+      {!easyModeEnabled && <View style={styles.section}>
         <Text style={styles.sectionTitle}>Risk Controls Pro</Text>
         <Text style={styles.sectionDescription}>Limits to reduce losses and protect capital.</Text>
 
@@ -474,9 +498,9 @@ export const SettingsScreen = () => {
             </Pressable>
           </View>
         </View>
-      </View>
+      </View>}
 
-      <View style={styles.section}>
+      {!easyModeEnabled && <View style={styles.section}>
         <Text style={styles.sectionTitle}>Mode Presets</Text>
         <Text style={styles.sectionDescription}>
           Quick presets to make trading easier or safer.
@@ -487,9 +511,9 @@ export const SettingsScreen = () => {
         <Pressable style={styles.safeButton} onPress={applySafeMode}>
           <Text style={styles.applyButtonText}>Safe Mode (Stricter)</Text>
         </Pressable>
-      </View>
+      </View>}
 
-      <View style={styles.section}>
+      {!easyModeEnabled && <View style={styles.section}>
         <Text style={styles.sectionTitle}>Confirmations & Alerts</Text>
         <Text style={styles.sectionDescription}>Extra filters before trades are allowed.</Text>
 
@@ -578,9 +602,9 @@ export const SettingsScreen = () => {
             {alertOnSignalChange ? 'Signal Alerts On' : 'Signal Alerts Off'}
           </Text>
         </Pressable>
-      </View>
+      </View>}
 
-      <View style={styles.section}>
+      {!easyModeEnabled && <View style={styles.section}>
         <Text style={styles.sectionTitle}>Auto Trade Grade Filter</Text>
         <Text style={styles.sectionDescription}>
           Auto trade only when signal grade meets the filter.
@@ -599,9 +623,9 @@ export const SettingsScreen = () => {
             </Pressable>
           ))}
         </View>
-      </View>
+      </View>}
 
-      <View style={styles.section}>
+      {!easyModeEnabled && <View style={styles.section}>
         <Text style={styles.sectionTitle}>Trading Hours</Text>
         <Text style={styles.sectionDescription}>
           Allow trades only within a time window (local time).
@@ -653,9 +677,9 @@ export const SettingsScreen = () => {
             </Pressable>
           </View>
         </View>
-      </View>
+      </View>}
 
-      <View style={styles.section}>
+      {!easyModeEnabled && <View style={styles.section}>
         <Text style={styles.sectionTitle}>Auto Close</Text>
         <Text style={styles.sectionDescription}>
           Automatically close trades when stop loss is hit (while app is open).
@@ -671,7 +695,7 @@ export const SettingsScreen = () => {
             {autoCloseOnStop ? 'Auto Close On' : 'Auto Close Off'}
           </Text>
         </Pressable>
-      </View>
+      </View>}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Favorite Markets</Text>
@@ -701,7 +725,10 @@ export const SettingsScreen = () => {
           Free paper trading with Binance testnet. Do not use real keys. Keys are stored locally
           on this device.
         </Text>
-        <Text style={styles.sectionNote}>Use REAL mode to send testnet orders.</Text>
+        <Text style={styles.sectionNote}>
+          DEMO and REAL can both send testnet orders when enabled. Fees are included in the trade
+          math.
+        </Text>
 
         <TextInput
           value={apiKey}
@@ -824,24 +851,26 @@ export const SettingsScreen = () => {
           </Text>
         </Pressable>
 
-        <Pressable
-          style={[
-            styles.refreshButton,
-            autoTesting ? styles.buttonDisabled : styles.buttonGhost,
-          ]}
-          onPress={testAutoTrade}
-          disabled={autoTesting}
-        >
-          <Text style={styles.actionButtonText}>
-            {autoTesting
-              ? 'Testing...'
-              : autoHealth === 'ok'
-              ? 'Test Connection (OK)'
-              : autoHealth === 'fail'
-              ? 'Test Connection (Failed)'
-              : 'Test Connection'}
-          </Text>
-        </Pressable>
+        {!easyModeEnabled && (
+          <Pressable
+            style={[
+              styles.refreshButton,
+              autoTesting ? styles.buttonDisabled : styles.buttonGhost,
+            ]}
+            onPress={testAutoTrade}
+            disabled={autoTesting}
+          >
+            <Text style={styles.actionButtonText}>
+              {autoTesting
+                ? 'Testing...'
+                : autoHealth === 'ok'
+                ? 'Test Connection (OK)'
+                : autoHealth === 'fail'
+                ? 'Test Connection (Failed)'
+                : 'Test Connection'}
+            </Text>
+          </Pressable>
+        )}
 
         <Pressable
           style={[
@@ -869,27 +898,31 @@ export const SettingsScreen = () => {
             : 'Last sync: not yet'}
         </Text>
 
-        <Pressable
-          style={[
-            styles.refreshButton,
-            autoLogLoading ? styles.buttonDisabled : styles.buttonGhost,
-          ]}
-          onPress={fetchAutoLogs}
-          disabled={autoLogLoading}
-        >
-          <Text style={styles.actionButtonText}>
-            {autoLogLoading ? 'Loading logs...' : 'Fetch Server Logs'}
-          </Text>
-        </Pressable>
-        {autoLogs.length ? (
-          <View style={styles.logsBox}>
-            {autoLogs.slice(0, 6).map((log, index) => (
-              <Text key={`${log}-${index}`} style={styles.logText}>
-                {log}
+        {!easyModeEnabled && (
+          <>
+            <Pressable
+              style={[
+                styles.refreshButton,
+                autoLogLoading ? styles.buttonDisabled : styles.buttonGhost,
+              ]}
+              onPress={fetchAutoLogs}
+              disabled={autoLogLoading}
+            >
+              <Text style={styles.actionButtonText}>
+                {autoLogLoading ? 'Loading logs...' : 'Fetch Server Logs'}
               </Text>
-            ))}
-          </View>
-        ) : null}
+            </Pressable>
+            {autoLogs.length ? (
+              <View style={styles.logsBox}>
+                {autoLogs.slice(0, 6).map((log, index) => (
+                  <Text key={`${log}-${index}`} style={styles.logText}>
+                    {log}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+          </>
+        )}
       </View>
 
       <View style={styles.section}>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { createTickerStream, fetchPrice } from '../services/binance';
 import type { TickerStreamStatus } from '../services/binance';
-import { calculateOpenPnL } from '../services/trading';
+import { BINANCE_SPOT_FEE_RATE, calculateOpenPnL } from '../services/trading';
 import { useStore } from '../store/useStore';
 import { Trade } from '../types/trading';
 
@@ -37,6 +37,8 @@ export const PortfolioScreen = () => {
   const [streamStatus, setStreamStatus] = useState<TickerStreamStatus>('offline');
 
   const activeTrades = trades.filter((trade) => trade.status === 'OPEN' && trade.mode === mode);
+  const activeTradesRef = useRef<Trade[]>(activeTrades);
+  const closingTradesRef = useRef<Record<string, boolean>>({});
   const activeSymbols = useMemo(
     () => [...new Set(activeTrades.map((trade) => trade.symbol))],
     [activeTrades]
@@ -66,6 +68,10 @@ export const PortfolioScreen = () => {
   };
 
   useEffect(() => {
+    activeTradesRef.current = activeTrades;
+  }, [activeTrades]);
+
+  useEffect(() => {
     refreshPrices();
 
     if (activeSymbols.length === 0) {
@@ -84,13 +90,14 @@ export const PortfolioScreen = () => {
           [ticker.symbol]: ticker.lastPrice,
         }));
         if (autoCloseOnStop) {
-          const trade = activeTrades.find((item) => item.symbol === ticker.symbol);
+          const trade = activeTradesRef.current.find((item) => item.symbol === ticker.symbol);
           if (trade && trade.status === 'OPEN') {
             const hit =
               trade.direction === 'BUY'
                 ? ticker.lastPrice <= trade.stopLoss
                 : ticker.lastPrice >= trade.stopLoss;
-            if (hit) {
+            if (hit && !closingTradesRef.current[trade.id]) {
+              closingTradesRef.current[trade.id] = true;
               closeTrade(trade.id, ticker.lastPrice);
             }
           }
@@ -111,7 +118,7 @@ export const PortfolioScreen = () => {
       active = false;
       stream.close();
     };
-  }, [activeSymbols.join('|'), autoCloseOnStop, activeTrades, closeTrade]);
+  }, [activeSymbols.join('|'), autoCloseOnStop, closeTrade]);
 
   const openPnl = useMemo(() => {
     return activeTrades.reduce((sum, trade) => {
@@ -121,6 +128,7 @@ export const PortfolioScreen = () => {
   }, [activeTrades, prices]);
 
   const closedPnl = closedTrades.reduce((sum, trade) => sum + (trade.pnl ?? 0), 0);
+  const totalFees = closedTrades.reduce((sum, trade) => sum + (trade.feesPaid ?? 0), 0);
   const wins = closedTrades.filter((trade) => (trade.pnl ?? 0) > 0).length;
   const winRate = closedTrades.length ? (wins / closedTrades.length) * 100 : 0;
 
@@ -171,6 +179,7 @@ export const PortfolioScreen = () => {
       'closePrice',
       'closedAt',
       'pnl',
+      'feesPaid',
       'mode',
     ];
     const rows = trades.map((trade) => [
@@ -186,6 +195,7 @@ export const PortfolioScreen = () => {
       trade.closePrice ?? '',
       trade.closedAt ? new Date(trade.closedAt).toISOString() : '',
       trade.pnl ?? '',
+      trade.feesPaid ?? '',
       trade.mode,
     ]);
 
@@ -283,6 +293,14 @@ export const PortfolioScreen = () => {
             </Text>
           </View>
           <View style={styles.metricItem}>
+            <Text style={styles.metricLabel}>Fees Paid</Text>
+            <Text style={styles.metricValue}>${money(totalFees)}</Text>
+          </View>
+          <View style={styles.metricItem}>
+            <Text style={styles.metricLabel}>Binance Fee</Text>
+            <Text style={styles.metricValue}>{(BINANCE_SPOT_FEE_RATE * 100).toFixed(2)}% / side</Text>
+          </View>
+          <View style={styles.metricItem}>
             <Text style={styles.metricLabel}>Win Rate</Text>
             <Text style={styles.metricValue}>{winRate.toFixed(1)}%</Text>
           </View>
@@ -353,6 +371,9 @@ export const PortfolioScreen = () => {
               >
                 {(trade.pnl ?? 0) >= 0 ? '+' : ''}${money(trade.pnl ?? 0)}
               </Text>
+              <Text style={styles.historyMeta}>
+                Fees ${money(trade.feesPaid ?? 0)}
+              </Text>
             </View>
           ))
         )}
@@ -369,7 +390,7 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 14,
-    paddingBottom: 30,
+    paddingBottom: 96,
   },
   summaryCard: {
     backgroundColor: '#111827',

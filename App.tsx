@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { NavigationContainer, DarkTheme, Theme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MarketScreen } from './src/screens/MarketScreen';
 import { PortfolioScreen } from './src/screens/PortfolioScreen';
 import { LiveScreen } from './src/screens/LiveScreen';
@@ -45,7 +46,10 @@ const ModeBadge = () => {
   );
 };
 
-export default function App() {
+const AppNavigator = () => {
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 10);
+
   return (
     <NavigationContainer theme={navTheme}>
       <StatusBar style="light" />
@@ -59,9 +63,9 @@ export default function App() {
           tabBarStyle: {
             backgroundColor: '#111827',
             borderTopColor: '#1F2937',
-            height: 64,
+            height: 64 + bottomInset,
             paddingTop: 6,
-            paddingBottom: 8,
+            paddingBottom: bottomInset,
           },
           tabBarIcon: ({ focused, color, size }) => {
             const iconMap: Record<keyof TabParamList, keyof typeof Ionicons.glyphMap> = {
@@ -81,6 +85,14 @@ export default function App() {
         <Tab.Screen name="Settings" component={SettingsScreen} />
       </Tab.Navigator>
     </NavigationContainer>
+  );
+};
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppNavigator />
+    </SafeAreaProvider>
   );
 }
 

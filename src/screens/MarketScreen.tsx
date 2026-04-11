@@ -51,6 +51,7 @@ const formatPrice = (value: number) => {
 export const MarketScreen = () => {
   const {
     mode,
+    easyModeEnabled,
     demoBalance,
     realBalance,
     favorites,
@@ -82,6 +83,7 @@ export const MarketScreen = () => {
   const lastSignalRef = useRef<Record<string, { type: SignalType; at: number }>>({});
 
   const balance = mode === 'DEMO' ? demoBalance : realBalance;
+  const relaxedMode = easyModeEnabled || mode === 'DEMO';
 
   const refreshTickers = async (allowFallback: boolean) => {
     const latestTickers = await fetchTickers(SYMBOLS, { allowFallback });
@@ -343,7 +345,7 @@ export const MarketScreen = () => {
       return;
     }
 
-    if (tradeHoursEnabled) {
+    if (!relaxedMode && tradeHoursEnabled) {
       const hour = new Date().getHours();
       const inWindow =
         tradeStartHour <= tradeEndHour
@@ -361,7 +363,7 @@ export const MarketScreen = () => {
       return;
     }
 
-    if (requireConfirmations && !manualOverrideEnabled) {
+    if (!relaxedMode && requireConfirmations && !manualOverrideEnabled) {
       const alignment = signal.alignmentScore ?? 0;
       if (alignment < minAlignmentScore) {
         Alert.alert('Trade blocked', 'Not enough timeframe confirmations.');
@@ -396,7 +398,7 @@ export const MarketScreen = () => {
       return;
     }
 
-    const shouldSendOrder = binanceTestnetEnabled && mode === 'REAL';
+    const shouldSendOrder = binanceTestnetEnabled;
 
     if (shouldSendOrder) {
       setPlacingOrder(true);
@@ -494,7 +496,7 @@ export const MarketScreen = () => {
         </Text>
       </View>
 
-      <View style={styles.quickCard}>
+      {!easyModeEnabled && <View style={styles.quickCard}>
         <Text style={styles.healthTitle}>Quick Controls</Text>
         <View style={styles.quickRow}>
           <Pressable
@@ -523,7 +525,7 @@ export const MarketScreen = () => {
         <Text style={styles.quickHint}>
           Turn confirmations off if trades feel blocked. You can always switch back in Settings.
         </Text>
-      </View>
+      </View>}
 
       {marketHealth ? (
         <View style={styles.healthCard}>
@@ -562,7 +564,7 @@ export const MarketScreen = () => {
         </View>
       ) : null}
 
-      <View style={styles.radarCard}>
+      {!easyModeEnabled && <View style={styles.radarCard}>
         <Text style={styles.healthTitle}>Volatility Radar</Text>
         {sortedTickers
           .slice()
@@ -581,9 +583,9 @@ export const MarketScreen = () => {
               </Text>
             </View>
           ))}
-      </View>
+      </View>}
 
-      <View style={styles.heatmapCard}>
+      {!easyModeEnabled && <View style={styles.heatmapCard}>
         <Text style={styles.healthTitle}>Watchlist Heatmap</Text>
         <View style={styles.heatmapGrid}>
           {heatmapItems.map((item) => (
@@ -602,7 +604,7 @@ export const MarketScreen = () => {
             </View>
           ))}
         </View>
-      </View>
+      </View>}
 
       {sortedTickers.map((ticker) => {
         const signal = signals[ticker.symbol];
@@ -729,7 +731,7 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 12,
-    paddingBottom: 30,
+    paddingBottom: 96,
   },
   centered: {
     flex: 1,

@@ -40,6 +40,13 @@ const SYMBOLS = [
   'APTUSDT',
 ];
 const MAX_POINTS = 48;
+type EasyPreset = 'SAFE' | 'BALANCED' | 'FAST';
+
+const EASY_PRESET_CONFIG: Record<EasyPreset, { stopPct: number; takePct: number }> = {
+  SAFE: { stopPct: 0.01, takePct: 0.015 },
+  BALANCED: { stopPct: 0.015, takePct: 0.03 },
+  FAST: { stopPct: 0.02, takePct: 0.05 },
+};
 
 const formatPrice = (value: number) => {
   return value.toLocaleString(undefined, {
@@ -51,6 +58,7 @@ const formatPrice = (value: number) => {
 export const LiveScreen = () => {
   const {
     mode,
+    easyModeEnabled,
     demoBalance,
     realBalance,
     riskPerTrade,
@@ -65,6 +73,7 @@ export const LiveScreen = () => {
     maxAtrPercent,
     favorites,
     autoGradeFilter,
+    canOpenTrade,
   } = useStore((state) => state);
 
   const balance = mode === 'DEMO' ? demoBalance : realBalance;
@@ -94,7 +103,10 @@ export const LiveScreen = () => {
   const [moverThreshold, setMoverThreshold] = useState('5');
   const lastMoverAlertAtRef = useRef(0);
   const [minRR, setMinRR] = useState(1.2);
-  const [liteMode, setLiteMode] = useState(true);
+  const liteMode = easyModeEnabled;
+  const [easyDirection, setEasyDirection] = useState<'BUY' | 'SELL'>('BUY');
+  const [easyAmountUsd, setEasyAmountUsd] = useState('10');
+  const [easyPreset, setEasyPreset] = useState<EasyPreset>('BALANCED');
   const [opportunities, setOpportunities] = useState<
     Array<{
       symbol: string;
@@ -126,7 +138,7 @@ export const LiveScreen = () => {
     return () => {
       active = false;
     };
-  }, [moverAlertEnabled, moverThreshold]);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -446,6 +458,61 @@ export const LiveScreen = () => {
     );
   };
 
+  const executeEasyTrade = () => {
+    if (!price) {
+      Alert.alert('Price unavailable', 'Wait for live price before opening a quick trade.');
+      return;
+    }
+    const amountUsd = Number(easyAmountUsd);
+    if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
+      Alert.alert('Invalid amount', 'Enter a valid USD amount.');
+      return;
+    }
+    const guard = canOpenTrade(balance);
+    if (!guard.ok) {
+      Alert.alert('Trade blocked', guard.reason ?? 'Risk limits active.');
+      return;
+    }
+
+    const config = EASY_PRESET_CONFIG[easyPreset];
+    const entry = price;
+    const stopLoss =
+      easyDirection === 'BUY'
+        ? entry * (1 - config.stopPct)
+        : entry * (1 + config.stopPct);
+    const takeProfit =
+      easyDirection === 'BUY'
+        ? entry * (1 + config.takePct)
+        : entry * (1 - config.takePct);
+    const quantity = amountUsd / entry;
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      Alert.alert('Cannot open trade', 'Quantity is invalid for this setup.');
+      return;
+    }
+
+    openTrade({
+      symbol,
+      direction: easyDirection,
+      entryPrice: entry,
+      quantity,
+      stopLoss,
+      takeProfit,
+      confidence: signal?.confidence ?? 'MEDIUM',
+      reason: `Easy quick trade (${easyPreset})`,
+    });
+
+    setDirection(easyDirection);
+    setEntryPrice(entry.toFixed(2));
+    setStopLoss(stopLoss.toFixed(2));
+    setTakeProfit(takeProfit.toFixed(2));
+
+    Alert.alert(
+      'Easy trade opened',
+      `${easyDirection} ${symbol}\n$${amountUsd.toFixed(2)}\nPreset: ${easyPreset}`
+    );
+  };
+
   const toggleAutoTrade = async (enabled: boolean) => {
     if (!autoServerUrl || !autoToken) {
       Alert.alert('Missing server info', 'Set Auto Trade server URL and token in Settings.');
@@ -511,6 +578,53 @@ export const LiveScreen = () => {
         ))}
       </View>
 
+      <View style={styles.manualCard}>
+        <Text style={styles.sectionTitle}>One-Tap Easy Trade</Text>
+        <Text style={styles.helperText}>
+          Works in {mode} mode. Demo uses the same trade flow as real, just with a $40 bankroll.
+        </Text>
+        <View style={styles.directionRow}>
+          <Pressable
+            style={[styles.directionButton, easyDirection === 'BUY' && styles.buyButton]}
+            onPress={() => setEasyDirection('BUY')}
+          >
+            <Text style={styles.directionText}>BUY</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.directionButton, easyDirection === 'SELL' && styles.sellButton]}
+            onPress={() => setEasyDirection('SELL')}
+          >
+            <Text style={styles.directionText}>SELL</Text>
+          </Pressable>
+        </View>
+        <TextInput
+          value={easyAmountUsd}
+          onChangeText={setEasyAmountUsd}
+          placeholder="USD amount (ex: 10)"
+          placeholderTextColor="#64748B"
+          keyboardType="numeric"
+          style={styles.input}
+        />
+        <View style={styles.quickRow}>
+          {(['SAFE', 'BALANCED', 'FAST'] as const).map((preset) => (
+            <Pressable
+              key={preset}
+              style={[styles.filterButton, easyPreset === preset && styles.filterButtonActive]}
+              onPress={() => setEasyPreset(preset)}
+            >
+              <Text style={styles.filterButtonText}>{preset}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.helperText}>
+          {easyPreset} preset: SL {(EASY_PRESET_CONFIG[easyPreset].stopPct * 100).toFixed(1)}% | TP{' '}
+          {(EASY_PRESET_CONFIG[easyPreset].takePct * 100).toFixed(1)}%
+        </Text>
+        <Pressable style={styles.applyButton} onPress={executeEasyTrade}>
+          <Text style={styles.applyButtonText}>Open Easy Trade</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.priceCard}>
         <Text style={styles.priceLabel}>{symbol.replace('USDT', '')} / USDT</Text>
         <Text style={styles.priceValue}>{price ? `$${formatPrice(price)}` : '--'}</Text>
@@ -567,15 +681,11 @@ export const LiveScreen = () => {
 
       <View style={styles.signalCard}>
         <Text style={styles.sectionTitle}>Lite Mode</Text>
-        <Text style={styles.helperText}>Simplified view with only the essentials.</Text>
-        <Pressable
-          style={[styles.applyButton, liteMode ? styles.buyButton : styles.sellButton]}
-          onPress={() => setLiteMode(!liteMode)}
-        >
-          <Text style={styles.applyButtonText}>
-            {liteMode ? 'Lite Mode On' : 'Lite Mode Off'}
-          </Text>
-        </Pressable>
+        <Text style={styles.helperText}>
+          {liteMode
+            ? 'ON from Settings. Advanced sections are hidden.'
+            : 'OFF from Settings. Advanced sections are visible.'}
+        </Text>
       </View>
 
       {!liteMode && (
@@ -714,7 +824,8 @@ export const LiveScreen = () => {
         </View>
       )}
 
-      <View style={styles.manualCard}>
+      {!liteMode && (
+        <View style={styles.manualCard}>
         <Text style={styles.sectionTitle}>Manual Trade</Text>
         <View style={styles.directionRow}>
           <Pressable
@@ -796,7 +907,8 @@ export const LiveScreen = () => {
         <Pressable style={styles.applyButton} onPress={executeManual}>
           <Text style={styles.applyButtonText}>Execute Manual Trade</Text>
         </Pressable>
-      </View>
+        </View>
+      )}
 
       {!liteMode && (
         <View style={styles.manualCard}>
@@ -881,7 +993,7 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 14,
-    paddingBottom: 30,
+    paddingBottom: 96,
   },
   title: {
     color: '#F8FAFC',

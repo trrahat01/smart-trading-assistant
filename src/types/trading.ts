@@ -61,6 +61,11 @@ export interface Trade {
   direction: TradeDirection;
   entryPrice: number;
   quantity: number;
+  feeRate?: number;
+  entryFee?: number;
+  exitFee?: number;
+  feesPaid?: number;
+  grossPnl?: number;
   stopLoss: number;
   takeProfit: number;
   confidence: Confidence;

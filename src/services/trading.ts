@@ -1,5 +1,7 @@
 import { Kline, Trade, TradingSignal } from '../types/trading';
 
+export const BINANCE_SPOT_FEE_RATE = 0.001;
+
 const clamp = (value: number, min: number, max: number) => {
   return Math.max(min, Math.min(max, value));
 };
@@ -117,12 +119,22 @@ export const calculatePositionSize = (
   return riskAmount / stopDistance;
 };
 
+export const calculateTradeFee = (notional: number, feeRate = BINANCE_SPOT_FEE_RATE): number => {
+  if (!Number.isFinite(notional) || notional <= 0) {
+    return 0;
+  }
+  return notional * feeRate;
+};
+
 export const calculateOpenPnL = (trade: Trade, currentPrice: number): number => {
   const diff =
     trade.direction === 'BUY'
       ? currentPrice - trade.entryPrice
       : trade.entryPrice - currentPrice;
-  return diff * trade.quantity;
+  const feeRate = trade.feeRate ?? BINANCE_SPOT_FEE_RATE;
+  const entryFee = trade.entryFee ?? calculateTradeFee(trade.entryPrice * trade.quantity, feeRate);
+  const exitFee = calculateTradeFee(currentPrice * trade.quantity, feeRate);
+  return diff * trade.quantity - entryFee - exitFee;
 };
 
 export const generateSignal = (

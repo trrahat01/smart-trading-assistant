@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { QuizAttempt, Trade, TradingMode } from '../types/trading';
+import { BINANCE_SPOT_FEE_RATE, calculateTradeFee } from '../services/trading';
 
 interface OpenTradePayload {
   symbol: string;
@@ -16,6 +17,7 @@ interface OpenTradePayload {
 
 interface TradingState {
   mode: TradingMode;
+  easyModeEnabled: boolean;
   demoBalance: number;
   realBalance: number;
   riskPerTrade: number;
@@ -57,6 +59,7 @@ interface TradingState {
   quizAttempts: QuizAttempt[];
 
   setMode: (mode: TradingMode) => void;
+  setEasyModeEnabled: (value: boolean) => void;
   setRiskPerTrade: (risk: number) => void;
   toggleFavorite: (symbol: string) => void;
   setBinanceTestnetEnabled: (enabled: boolean) => void;
@@ -86,11 +89,26 @@ interface TradingState {
 
 const clampRisk = (risk: number) => Math.max(1, Math.min(10, Math.round(risk)));
 
-const computePnl = (trade: Trade, closePrice: number): number => {
+const computeGrossPnl = (trade: Trade, closePrice: number): number => {
   if (trade.direction === 'BUY') {
     return (closePrice - trade.entryPrice) * trade.quantity;
   }
   return (trade.entryPrice - closePrice) * trade.quantity;
+};
+
+const computeNetPnl = (trade: Trade, closePrice: number): { grossPnl: number; entryFee: number; exitFee: number; feesPaid: number; pnl: number } => {
+  const feeRate = trade.feeRate ?? BINANCE_SPOT_FEE_RATE;
+  const grossPnl = computeGrossPnl(trade, closePrice);
+  const entryFee = trade.entryFee ?? calculateTradeFee(trade.entryPrice * trade.quantity, feeRate);
+  const exitFee = calculateTradeFee(closePrice * trade.quantity, feeRate);
+  const feesPaid = entryFee + exitFee;
+  return {
+    grossPnl,
+    entryFee,
+    exitFee,
+    feesPaid,
+    pnl: grossPnl - feesPaid,
+  };
 };
 
 const todayKey = () => new Date().toLocaleDateString('en-CA');
@@ -110,12 +128,14 @@ const defaultDailyStatsByMode = () => ({
   DEMO: defaultDailyStats(),
   REAL: defaultDailyStats(),
 });
+const DEMO_STARTING_BALANCE = 40;
 
 export const useStore = create<TradingState>()(
   persist(
     (set, get) => ({
       mode: 'DEMO',
-      demoBalance: 10000,
+      easyModeEnabled: true,
+      demoBalance: DEMO_STARTING_BALANCE,
       realBalance: 1000,
       riskPerTrade: 2,
       favorites: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'],
@@ -141,6 +161,7 @@ export const useStore = create<TradingState>()(
       quizAttempts: [],
 
       setMode: (mode) => set({ mode }),
+      setEasyModeEnabled: (value) => set({ easyModeEnabled: value }),
 
       setRiskPerTrade: (risk) => set({ riskPerTrade: clampRisk(risk) }),
 
@@ -214,6 +235,8 @@ export const useStore = create<TradingState>()(
                 direction: payload.direction,
                 entryPrice: payload.entryPrice,
                 quantity: payload.quantity,
+                feeRate: BINANCE_SPOT_FEE_RATE,
+                entryFee: calculateTradeFee(payload.entryPrice * payload.quantity),
                 stopLoss: payload.stopLoss,
                 takeProfit: payload.takeProfit,
                 confidence: payload.confidence,
@@ -241,7 +264,7 @@ export const useStore = create<TradingState>()(
             return state;
           }
 
-          const pnl = computePnl(trade, closePrice);
+          const { grossPnl, entryFee, exitFee, feesPaid, pnl } = computeNetPnl(trade, closePrice);
           const mode = trade.mode;
           const statsForMode = state.dailyStatsByMode[mode];
           const nextStats = statsForMode.date === todayKey() ? statsForMode : defaultDailyStats();
@@ -257,6 +280,10 @@ export const useStore = create<TradingState>()(
                   status: 'CLOSED' as const,
                   closePrice,
                   pnl,
+                  grossPnl,
+                  entryFee,
+                  exitFee,
+                  feesPaid,
                   closedAt: Date.now(),
                 }
               : item
@@ -294,7 +321,7 @@ export const useStore = create<TradingState>()(
 
       resetDemo: () =>
         set((state) => ({
-          demoBalance: 10000,
+          demoBalance: DEMO_STARTING_BALANCE,
           trades: state.trades.filter((trade) => trade.mode !== 'DEMO'),
           dailyStatsByMode: {
             ...state.dailyStatsByMode,
