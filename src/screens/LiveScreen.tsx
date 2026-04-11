@@ -67,6 +67,7 @@ export const LiveScreen = () => {
     maxTradesPerDay,
     minAlignmentScore,
     requireConfirmations,
+    manualOverrideEnabled,
     tradeHoursEnabled,
     tradeStartHour,
     tradeEndHour,
@@ -447,7 +448,8 @@ export const LiveScreen = () => {
       minAlignmentScore,
       autoPauseVolatility,
       maxAtrPercent,
-      manualOverrideEnabled: true,
+      manualOverrideEnabled,
+      signal,
       canOpenTrade,
     });
     if (blockReason) {
@@ -494,7 +496,8 @@ export const LiveScreen = () => {
       minAlignmentScore,
       autoPauseVolatility,
       maxAtrPercent,
-      manualOverrideEnabled: true,
+      manualOverrideEnabled,
+      signal,
       canOpenTrade,
     });
     if (blockReason) {
