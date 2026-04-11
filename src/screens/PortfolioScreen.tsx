@@ -69,6 +69,12 @@ export const PortfolioScreen = () => {
 
   useEffect(() => {
     activeTradesRef.current = activeTrades;
+    const openIds = new Set(activeTrades.map((trade) => trade.id));
+    Object.keys(closingTradesRef.current).forEach((tradeId) => {
+      if (!openIds.has(tradeId)) {
+        delete closingTradesRef.current[tradeId];
+      }
+    });
   }, [activeTrades]);
 
   useEffect(() => {
