@@ -376,7 +376,7 @@ export const SettingsScreen = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Trading Mode</Text>
         <Text style={styles.sectionDescription}>
-          DEMO and REAL use the same trade flow with Binance-style fees. DEMO starts with $40.
+          DEMO and REAL use the same rule engine with Binance-style fees. DEMO starts with $40.
         </Text>
 
         <View style={styles.modeRow}>

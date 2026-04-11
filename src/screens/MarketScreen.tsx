@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { createTickerStream, fetchKlines, fetchTickers } from '../services/binance';
 import type { TickerStreamStatus } from '../services/binance';
 import { calculatePositionSize, generateSignal } from '../services/trading';
+import { getTradeBlockReason } from '../services/tradeRules';
 import { useStore } from '../store/useStore';
 import { MarketTicker, SignalType, TradingSignal } from '../types/trading';
 import { placeTestnetMarketOrder, validateTestnetOrder } from '../services/binanceTrade';
@@ -344,47 +345,22 @@ export const MarketScreen = () => {
       return;
     }
 
-    if (!easyModeEnabled && tradeHoursEnabled) {
-      const hour = new Date().getHours();
-      const inWindow =
-        tradeStartHour <= tradeEndHour
-          ? hour >= tradeStartHour && hour <= tradeEndHour
-          : hour >= tradeStartHour || hour <= tradeEndHour;
-      if (!inWindow) {
-        Alert.alert('Trade blocked', 'Outside your allowed trading hours.');
-        return;
-      }
-    }
-
-    const guard = canOpenTrade(balance);
-    if (!guard.ok) {
-      Alert.alert('Trade blocked', guard.reason ?? 'Risk limits active.');
+    const blockReason = getTradeBlockReason({
+      balance,
+      tradeHoursEnabled,
+      tradeStartHour,
+      tradeEndHour,
+      requireConfirmations,
+      minAlignmentScore,
+      autoPauseVolatility,
+      maxAtrPercent,
+      manualOverrideEnabled,
+      canOpenTrade,
+      signal,
+    });
+    if (blockReason) {
+      Alert.alert('Trade blocked', blockReason);
       return;
-    }
-
-    if (!easyModeEnabled && requireConfirmations && !manualOverrideEnabled) {
-      const alignment = signal.alignmentScore ?? 0;
-      if (alignment < minAlignmentScore) {
-        Alert.alert('Trade blocked', 'Not enough timeframe confirmations.');
-        return;
-      }
-      if (
-        signal.higherTimeframe?.trend &&
-        signal.trend &&
-        signal.higherTimeframe.trend !== 'NEUTRAL' &&
-        signal.higherTimeframe.trend !== signal.trend
-      ) {
-        Alert.alert('Trade blocked', 'Higher timeframe trend conflicts.');
-        return;
-      }
-      if (
-        autoPauseVolatility &&
-        signal.metrics?.atrPercent &&
-        signal.metrics.atrPercent > maxAtrPercent
-      ) {
-        Alert.alert('Trade blocked', 'Volatility is too high right now.');
-        return;
-      }
     }
     const quantity = calculatePositionSize(
       balance,

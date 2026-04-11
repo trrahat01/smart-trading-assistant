@@ -13,6 +13,7 @@ import { createTickerStream, fetchKlines, fetchTickers } from '../services/binan
 import { getBinanceKeys } from '../services/binanceKeys';
 import { pushAutoTradeConfig, loadAutoTradeSettings } from '../services/autoTrade';
 import { calculatePositionSize, generateSignal } from '../services/trading';
+import { getTradeBlockReason } from '../services/tradeRules';
 import { useStore } from '../store/useStore';
 import { TradingSignal } from '../types/trading';
 
@@ -437,6 +438,22 @@ export const LiveScreen = () => {
       Alert.alert('Invalid input', 'Enter valid entry, stop loss, and take profit.');
       return;
     }
+    const blockReason = getTradeBlockReason({
+      balance,
+      tradeHoursEnabled,
+      tradeStartHour,
+      tradeEndHour,
+      requireConfirmations,
+      minAlignmentScore,
+      autoPauseVolatility,
+      maxAtrPercent,
+      manualOverrideEnabled: true,
+      canOpenTrade,
+    });
+    if (blockReason) {
+      Alert.alert('Trade blocked', blockReason);
+      return;
+    }
     const quantity = calculatePositionSize(balance, riskPerTrade, entry, stop);
     if (!Number.isFinite(quantity) || quantity <= 0) {
       Alert.alert('Cannot open trade', 'Position size is invalid for this setup.');
@@ -468,9 +485,20 @@ export const LiveScreen = () => {
       Alert.alert('Invalid amount', 'Enter a valid USD amount.');
       return;
     }
-    const guard = canOpenTrade(balance);
-    if (!guard.ok) {
-      Alert.alert('Trade blocked', guard.reason ?? 'Risk limits active.');
+    const blockReason = getTradeBlockReason({
+      balance,
+      tradeHoursEnabled,
+      tradeStartHour,
+      tradeEndHour,
+      requireConfirmations,
+      minAlignmentScore,
+      autoPauseVolatility,
+      maxAtrPercent,
+      manualOverrideEnabled: true,
+      canOpenTrade,
+    });
+    if (blockReason) {
+      Alert.alert('Trade blocked', blockReason);
       return;
     }
 
@@ -581,7 +609,7 @@ export const LiveScreen = () => {
       <View style={styles.manualCard}>
         <Text style={styles.sectionTitle}>One-Tap Easy Trade</Text>
         <Text style={styles.helperText}>
-          Works in {mode} mode. Demo uses the same trade flow as real, just with a $40 bankroll.
+          Works in {mode} mode. Both modes use the same rule engine; demo starts with $40.
         </Text>
         <View style={styles.directionRow}>
           <Pressable
