@@ -376,8 +376,7 @@ export const SettingsScreen = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Trading Mode</Text>
         <Text style={styles.sectionDescription}>
-          DEMO and REAL use the same trade flow with Binance-style fees. DEMO starts with $40 so
-          you can practice safely.
+          DEMO and REAL use the same trade flow with Binance-style fees. DEMO starts with $40.
         </Text>
 
         <View style={styles.modeRow}>
@@ -927,7 +926,7 @@ export const SettingsScreen = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Reset</Text>
-        <Text style={styles.sectionDescription}>Use reset tools when you want a fresh practice cycle.</Text>
+        <Text style={styles.sectionDescription}>Use reset tools when you want a fresh trade cycle.</Text>
 
         <Pressable
           style={styles.resetButton}

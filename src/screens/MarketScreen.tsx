@@ -83,7 +83,6 @@ export const MarketScreen = () => {
   const lastSignalRef = useRef<Record<string, { type: SignalType; at: number }>>({});
 
   const balance = mode === 'DEMO' ? demoBalance : realBalance;
-  const relaxedMode = easyModeEnabled || mode === 'DEMO';
 
   const refreshTickers = async (allowFallback: boolean) => {
     const latestTickers = await fetchTickers(SYMBOLS, { allowFallback });
@@ -345,7 +344,7 @@ export const MarketScreen = () => {
       return;
     }
 
-    if (!relaxedMode && tradeHoursEnabled) {
+    if (!easyModeEnabled && tradeHoursEnabled) {
       const hour = new Date().getHours();
       const inWindow =
         tradeStartHour <= tradeEndHour
@@ -363,7 +362,7 @@ export const MarketScreen = () => {
       return;
     }
 
-    if (!relaxedMode && requireConfirmations && !manualOverrideEnabled) {
+    if (!easyModeEnabled && requireConfirmations && !manualOverrideEnabled) {
       const alignment = signal.alignmentScore ?? 0;
       if (alignment < minAlignmentScore) {
         Alert.alert('Trade blocked', 'Not enough timeframe confirmations.');
