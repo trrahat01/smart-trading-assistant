@@ -356,6 +356,11 @@ export const useStore = create<TradingState>()(
     {
       name: 'smart-trading-assistant-store',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 2,
+      migrate: (persistedState) => ({
+        ...(persistedState as Partial<TradingState>),
+        easyModeEnabled: true,
+      }),
     }
   )
 );

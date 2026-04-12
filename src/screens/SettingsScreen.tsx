@@ -56,7 +56,6 @@ export const SettingsScreen = () => {
     autoGradeFilter,
     alertOnSignalChange,
     setMode,
-    setEasyModeEnabled,
     setRiskPerTrade,
     toggleFavorite,
     setBinanceTestnetEnabled,
@@ -78,38 +77,6 @@ export const SettingsScreen = () => {
     resetDemo,
     resetLearning,
   } = useStore((state) => state);
-
-  const applyEasyMode = () => {
-    setRequireConfirmations(false);
-    setMinAlignmentScore(0);
-    setAutoPauseVolatility(false);
-    setMaxAtrPercent(0.05);
-    setManualOverrideEnabled(true);
-    setMaxTradesPerDay(8);
-    setMaxDailyLossPct(6);
-    setLossStreakLimit(3);
-    setCooldownMinutes(30);
-  };
-
-  const toggleEasyMode = () => {
-    const next = !easyModeEnabled;
-    setEasyModeEnabled(next);
-    if (next) {
-      applyEasyMode();
-    }
-  };
-
-  const applySafeMode = () => {
-    setRequireConfirmations(true);
-    setMinAlignmentScore(2);
-    setAutoPauseVolatility(true);
-    setMaxAtrPercent(0.03);
-    setManualOverrideEnabled(false);
-    setMaxTradesPerDay(3);
-    setMaxDailyLossPct(3);
-    setLossStreakLimit(2);
-    setCooldownMinutes(90);
-  };
 
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
@@ -363,14 +330,11 @@ export const SettingsScreen = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Easy Mode</Text>
         <Text style={styles.sectionDescription}>
-          Show simple controls only. Turn this off to see advanced options.
+          Simple mode is always on. Advanced controls stay hidden by design.
         </Text>
-        <Pressable
-          style={[styles.toggleButton, easyModeEnabled ? styles.toggleOn : styles.toggleOff]}
-          onPress={toggleEasyMode}
-        >
-          <Text style={styles.toggleText}>{easyModeEnabled ? 'Easy Mode On' : 'Easy Mode Off'}</Text>
-        </Pressable>
+        <View style={[styles.toggleButton, styles.toggleOn]}>
+          <Text style={styles.toggleText}>Simple Mode On</Text>
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -497,19 +461,6 @@ export const SettingsScreen = () => {
             </Pressable>
           </View>
         </View>
-      </View>}
-
-      {!easyModeEnabled && <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Mode Presets</Text>
-        <Text style={styles.sectionDescription}>
-          Quick presets to make trading easier or safer.
-        </Text>
-        <Pressable style={styles.applyButton} onPress={applyEasyMode}>
-          <Text style={styles.applyButtonText}>Easy Mode (Faster)</Text>
-        </Pressable>
-        <Pressable style={styles.safeButton} onPress={applySafeMode}>
-          <Text style={styles.applyButtonText}>Safe Mode (Stricter)</Text>
-        </Pressable>
       </View>}
 
       {!easyModeEnabled && <View style={styles.section}>
