@@ -270,6 +270,13 @@ export const MarketScreen = () => {
     });
   }, [tickers, favorites]);
 
+  const visibleTickers = useMemo(() => {
+    if (!easyModeEnabled) {
+      return sortedTickers;
+    }
+    return sortedTickers.slice(0, 6);
+  }, [easyModeEnabled, sortedTickers]);
+
   const heatmapItems = useMemo(() => {
     return sortedTickers.map((ticker) => {
       const signal = signals[ticker.symbol];
@@ -502,7 +509,7 @@ export const MarketScreen = () => {
         </Text>
       </View>}
 
-      {marketHealth ? (
+      {!easyModeEnabled && marketHealth ? (
         <View style={styles.healthCard}>
           <View style={styles.rowBetween}>
             <Text style={styles.healthTitle}>Market Health</Text>
@@ -581,7 +588,7 @@ export const MarketScreen = () => {
         </View>
       </View>}
 
-      {sortedTickers.map((ticker) => {
+      {visibleTickers.map((ticker) => {
         const signal = signals[ticker.symbol];
         const isFav = favorites.includes(ticker.symbol);
         const isUp = ticker.priceChangePercent >= 0;

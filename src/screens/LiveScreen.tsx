@@ -178,6 +178,12 @@ export const LiveScreen = () => {
   }, [symbol]);
 
   useEffect(() => {
+    if (liteMode) {
+      setChartMode('line');
+    }
+  }, [liteMode]);
+
+  useEffect(() => {
     let active = true;
     const load = async () => {
       setLoadingSignal(true);
@@ -659,20 +665,22 @@ export const LiveScreen = () => {
       <View style={styles.priceCard}>
         <Text style={styles.priceLabel}>{symbol.replace('USDT', '')} / USDT</Text>
         <Text style={styles.priceValue}>{price ? `$${formatPrice(price)}` : '--'}</Text>
-        <View style={styles.directionRow}>
-          <Pressable
-            style={[styles.directionButton, chartMode === 'line' && styles.buyButton]}
-            onPress={() => setChartMode('line')}
-          >
-            <Text style={styles.directionText}>Line</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.directionButton, chartMode === 'candles' && styles.buyButton]}
-            onPress={() => setChartMode('candles')}
-          >
-            <Text style={styles.directionText}>Candles</Text>
-          </Pressable>
-        </View>
+        {!liteMode && (
+          <View style={styles.directionRow}>
+            <Pressable
+              style={[styles.directionButton, chartMode === 'line' && styles.buyButton]}
+              onPress={() => setChartMode('line')}
+            >
+              <Text style={styles.directionText}>Line</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.directionButton, chartMode === 'candles' && styles.buyButton]}
+              onPress={() => setChartMode('candles')}
+            >
+              <Text style={styles.directionText}>Candles</Text>
+            </Pressable>
+          </View>
+        )}
         <View
           style={styles.chartBox}
           onLayout={(event) => setChartWidth(event.nativeEvent.layout.width)}
