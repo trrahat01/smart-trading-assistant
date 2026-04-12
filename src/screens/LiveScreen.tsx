@@ -718,15 +718,6 @@ export const LiveScreen = () => {
         </View>
       </View>
 
-      <View style={styles.signalCard}>
-        <Text style={styles.sectionTitle}>Lite Mode</Text>
-        <Text style={styles.helperText}>
-          {liteMode
-            ? 'ON from Settings. Advanced sections are hidden.'
-            : 'OFF from Settings. Advanced sections are visible.'}
-        </Text>
-      </View>
-
       {!liteMode && (
         <View style={styles.signalCard}>
         <Text style={styles.sectionTitle}>Top Movers</Text>
@@ -774,55 +765,6 @@ export const LiveScreen = () => {
         <Text style={styles.helperText}>Tap a mover to load it in chart and trade panel.</Text>
         </View>
       )}
-
-      <View style={styles.signalCard}>
-        <Text style={styles.sectionTitle}>Best Setups (Easy)</Text>
-        <Text style={styles.helperText}>Only show setups with profit ratio.</Text>
-        <View style={styles.quickRow}>
-          {[1, 1.2, 1.5, 2].map((value) => (
-            <Pressable
-              key={value}
-              style={[
-                styles.filterButton,
-                minRR === value && styles.filterButtonActive,
-              ]}
-              onPress={() => setMinRR(value)}
-            >
-              <Text style={styles.filterButtonText}>{value}x</Text>
-            </Pressable>
-          ))}
-        </View>
-        {opportunities.length === 0 ? (
-          <Text style={styles.helperText}>Scanning for strong setups...</Text>
-        ) : (
-          opportunities.map((item) => (
-            <Pressable
-              key={item.symbol}
-              style={styles.opportunityRow}
-              onPress={() => {
-                setSymbol(item.symbol);
-                if (item.type) {
-                  setDirection(item.type);
-                }
-                setEntryPrice(item.entryPrice.toFixed(2));
-                setStopLoss(item.stopLoss.toFixed(2));
-                setTakeProfit(item.takeProfit.toFixed(2));
-              }}
-            >
-              <View>
-                <Text style={styles.opportunitySymbol}>
-                  {item.symbol.replace('USDT', '')} {item.grade ? `(${item.grade})` : ''}
-                </Text>
-                <Text style={styles.helperText}>
-                  {item.type} | R/R 1:{item.rr.toFixed(2)}
-                </Text>
-              </View>
-              <Text style={styles.opportunityScore}>{item.score.toFixed(0)}</Text>
-            </Pressable>
-          ))
-        )}
-        <Text style={styles.helperText}>Tap a setup to auto-fill manual trade.</Text>
-      </View>
 
       {!liteMode && (
         <View style={styles.signalCard}>

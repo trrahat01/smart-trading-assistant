@@ -274,7 +274,7 @@ export const MarketScreen = () => {
     if (!easyModeEnabled) {
       return sortedTickers;
     }
-    return sortedTickers.slice(0, 6);
+    return sortedTickers.slice(0, 1);
   }, [easyModeEnabled, sortedTickers]);
 
   const heatmapItems = useMemo(() => {
