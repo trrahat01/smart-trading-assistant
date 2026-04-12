@@ -464,7 +464,7 @@ export const MarketScreen = () => {
       }
     >
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Market Scanner</Text>
+        <Text style={styles.title}>Trade</Text>
         <Text style={styles.subtitle}>
           {statusLabel}
           {asOf ? ` - Updated ${new Date(asOf).toLocaleTimeString()}` : ''}

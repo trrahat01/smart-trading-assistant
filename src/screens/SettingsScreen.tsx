@@ -719,7 +719,7 @@ export const SettingsScreen = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Binance Testnet</Text>
+        <Text style={styles.sectionTitle}>Testnet Keys</Text>
         <Text style={styles.sectionDescription}>
           Free paper trading with Binance testnet. Do not use real keys. Keys are stored locally
           on this device.
@@ -806,7 +806,7 @@ export const SettingsScreen = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Auto Trade (Server)</Text>
+        <Text style={styles.sectionTitle}>Auto Trade</Text>
         <Text style={styles.sectionDescription}>
           Runs on a free server so it keeps trading even when your phone is closed. Testnet only.
         </Text>

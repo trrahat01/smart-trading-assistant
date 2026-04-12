@@ -69,20 +69,20 @@ const AppNavigator = () => {
           },
           tabBarIcon: ({ focused, color, size }) => {
             const iconMap: Record<keyof TabParamList, keyof typeof Ionicons.glyphMap> = {
-              Market: focused ? 'trending-up' : 'trending-up-outline',
+              Market: focused ? 'flash' : 'flash-outline',
               Portfolio: focused ? 'wallet' : 'wallet-outline',
               Live: focused ? 'pulse' : 'pulse-outline',
-              Settings: focused ? 'settings' : 'settings-outline',
+              Settings: focused ? 'menu' : 'menu-outline',
             };
             const iconName = iconMap[route.name as keyof TabParamList];
             return <Ionicons name={iconName} size={size} color={color} />;
           },
         })}
       >
-        <Tab.Screen name="Market" component={MarketScreen} />
-        <Tab.Screen name="Portfolio" component={PortfolioScreen} />
-        <Tab.Screen name="Live" component={LiveScreen} />
-        <Tab.Screen name="Settings" component={SettingsScreen} />
+        <Tab.Screen name="Market" component={MarketScreen} options={{ title: 'Trade' }} />
+        <Tab.Screen name="Portfolio" component={PortfolioScreen} options={{ title: 'Wallet' }} />
+        <Tab.Screen name="Live" component={LiveScreen} options={{ title: 'Live' }} />
+        <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: 'More' }} />
       </Tab.Navigator>
     </NavigationContainer>
   );

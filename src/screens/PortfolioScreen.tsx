@@ -227,7 +227,7 @@ export const PortfolioScreen = () => {
       }
     >
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Account Equity</Text>
+        <Text style={styles.summaryTitle}>Wallet</Text>
         <Text style={styles.summarySubtitle}>
           {streamStatus === 'live'
             ? 'Live Binance prices'

@@ -595,7 +595,7 @@ export const LiveScreen = () => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Live Market</Text>
+      <Text style={styles.title}>Live</Text>
 
       <View style={styles.symbolRow}>
         {SYMBOLS.map((item) => (
