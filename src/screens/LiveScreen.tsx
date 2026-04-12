@@ -679,11 +679,12 @@ export const LiveScreen = () => {
                 {signal.type} {signal.confidence}
               </Text>
             </View>
-            <Text style={styles.helperText}>{signal.marketSummary}</Text>
-            <Text style={styles.helperText}>
-              Entry ${signal.entryPrice.toFixed(2)} | SL ${signal.stopLoss.toFixed(2)} | TP{' '}
-              {signal.takeProfit.toFixed(2)}
-            </Text>
+            <Text style={styles.simpleSignalMeta}>{signal.marketSummary}</Text>
+            <View style={styles.simpleSignalRow}>
+              <Text style={styles.simpleSignalChip}>Entry ${signal.entryPrice.toFixed(2)}</Text>
+              <Text style={styles.simpleSignalChip}>SL ${signal.stopLoss.toFixed(2)}</Text>
+              <Text style={styles.simpleSignalChip}>TP ${signal.takeProfit.toFixed(2)}</Text>
+            </View>
             {signal.type !== 'HOLD' ? (
               <Pressable style={styles.applyButton} onPress={applySuggestion}>
                 <Text style={styles.applyButtonText}>Use Suggestion</Text>
@@ -1150,6 +1151,26 @@ const styles = StyleSheet.create({
   simpleSignalLabel: {
     color: '#E2E8F0',
     fontSize: 13,
+    fontWeight: '700',
+  },
+  simpleSignalMeta: {
+    color: '#94A3B8',
+    fontSize: 12,
+  },
+  simpleSignalRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  simpleSignalChip: {
+    color: '#E2E8F0',
+    backgroundColor: '#111827',
+    borderColor: '#1F2937',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    fontSize: 11,
     fontWeight: '700',
   },
   rowBetween: {

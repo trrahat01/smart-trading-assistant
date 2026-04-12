@@ -508,8 +508,7 @@ export const MarketScreen = () => {
                 <View style={styles.suggestionSymbolBox}>
                   <Text style={styles.suggestionSymbol}>{symbol.replace('USDT', '')}</Text>
                   <Text style={styles.suggestionMeta}>
-                    {signal.type} {signal.confidence}
-                    {signal.grade ? ` • ${signal.grade}` : ''}
+                    {signal.grade ? `Grade ${signal.grade}` : 'Grade C'} • Score {signal.score}
                   </Text>
                 </View>
                 <View style={styles.suggestionPriceBox}>
@@ -518,6 +517,18 @@ export const MarketScreen = () => {
                     TP ${formatPrice(signal.takeProfit)} | SL ${formatPrice(signal.stopLoss)}
                   </Text>
                 </View>
+                <Text
+                  style={[
+                    styles.suggestionBadge,
+                    signal.type === 'BUY'
+                      ? styles.suggestionBadgeBuy
+                      : signal.type === 'SELL'
+                      ? styles.suggestionBadgeSell
+                      : styles.suggestionBadgeHold,
+                  ]}
+                >
+                  {signal.type} {signal.confidence}
+                </Text>
               </View>
             ))}
           </View>
@@ -1054,11 +1065,16 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   suggestionRow: {
+    backgroundColor: '#0B1226',
+    borderColor: '#1F2937',
+    borderWidth: 1,
+    borderRadius: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   suggestionSymbolBox: {
     flex: 1,
@@ -1079,6 +1095,24 @@ const styles = StyleSheet.create({
     color: '#F8FAFC',
     fontSize: 14,
     fontWeight: '700',
+  },
+  suggestionBadge: {
+    color: '#F8FAFC',
+    fontSize: 11,
+    fontWeight: '700',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  suggestionBadgeBuy: {
+    backgroundColor: '#14532D',
+  },
+  suggestionBadgeSell: {
+    backgroundColor: '#7F1D1D',
+  },
+  suggestionBadgeHold: {
+    backgroundColor: '#334155',
   },
   tradeButton: {
     borderRadius: 10,
