@@ -11,10 +11,13 @@ export interface AutoTradeConfig {
   symbols: string[];
   riskPerTrade: number;
   maxTradesPerDay: number;
+  dailyTradeLimit?: number;
   minAlignmentScore: number;
   requireConfirmations: boolean;
   autoPauseVolatility: boolean;
   maxAtrPercent: number;
+  stopLossMultiplier?: number;
+  takeProfitMultiplier?: number;
   tradeHoursEnabled: boolean;
   tradeStartHour: number;
   tradeEndHour: number;

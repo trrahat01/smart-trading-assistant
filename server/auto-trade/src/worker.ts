@@ -11,10 +11,13 @@ interface StoredConfig {
   symbols: string[];
   riskPerTrade: number;
   maxTradesPerDay: number;
+  dailyTradeLimit?: number;
   minAlignmentScore: number;
   requireConfirmations: boolean;
   autoPauseVolatility: boolean;
   maxAtrPercent: number;
+  stopLossMultiplier?: number;
+  takeProfitMultiplier?: number;
   tradeHoursEnabled?: boolean;
   tradeStartHour?: number;
   tradeEndHour?: number;
@@ -431,7 +434,11 @@ const tradeSymbol = async (config: StoredConfig, symbol: string, env: Env) => {
     ? (JSON.parse(statsRaw) as { tradesCount: number })
     : { tradesCount: 0 };
   const maxTrades = Number.isFinite(config.maxTradesPerDay) ? config.maxTradesPerDay : 5;
-  if (stats.tradesCount >= Math.max(1, maxTrades)) {
+  const dailyLimit = Number.isFinite(config.dailyTradeLimit)
+    ? Math.max(1, Math.floor(Number(config.dailyTradeLimit)))
+    : maxTrades;
+  const tradeLimit = Math.min(Math.max(1, maxTrades), dailyLimit);
+  if (stats.tradesCount >= tradeLimit) {
     await appendLog(env, config.deviceId, `Skipped ${symbol} max trades reached`);
     return;
   }
@@ -443,11 +450,19 @@ const tradeSymbol = async (config: StoredConfig, symbol: string, env: Env) => {
     return;
   }
 
-  const stopDistance = signal.currentPrice * Math.max(signal.atrPercent * 1.4, 0.012);
+  const stopMultiplier = Number.isFinite(config.stopLossMultiplier)
+    ? Math.max(0.5, Number(config.stopLossMultiplier))
+    : 1;
+  const takeMultiplier = Number.isFinite(config.takeProfitMultiplier)
+    ? Math.max(0.8, Number(config.takeProfitMultiplier))
+    : 2.2;
+  const stopDistance = signal.currentPrice * Math.max(signal.atrPercent * 1.4, 0.012) * stopMultiplier;
   const stopLoss =
     signal.type === 'BUY' ? signal.currentPrice - stopDistance : signal.currentPrice + stopDistance;
   const takeProfit =
-    signal.type === 'BUY' ? signal.currentPrice + stopDistance * 2 : signal.currentPrice - stopDistance * 2;
+    signal.type === 'BUY'
+      ? signal.currentPrice + stopDistance * takeMultiplier
+      : signal.currentPrice - stopDistance * takeMultiplier;
   const balance = await fetchTestnetBalance(config);
   const quantity = calculatePositionSize(balance, config.riskPerTrade, signal.currentPrice, stopLoss);
   if (quantity <= 0) {

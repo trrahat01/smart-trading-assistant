@@ -274,8 +274,16 @@ export const MarketScreen = () => {
     if (!easyModeEnabled) {
       return sortedTickers;
     }
-    return sortedTickers.slice(0, 1);
+    return sortedTickers.slice(0, 4);
   }, [easyModeEnabled, sortedTickers]);
+
+  const topSuggestions = useMemo(() => {
+    return Object.entries(signals)
+      .map(([symbol, signal]) => ({ symbol, signal }))
+      .filter(({ signal }) => signal && signal.type !== 'HOLD')
+      .sort((a, b) => Math.abs(b.signal.score) - Math.abs(a.signal.score))
+      .slice(0, easyModeEnabled ? 3 : 5);
+  }, [easyModeEnabled, signals]);
 
   const heatmapItems = useMemo(() => {
     return sortedTickers.map((ticker) => {
@@ -476,6 +484,46 @@ export const MarketScreen = () => {
           {statusLabel}
           {asOf ? ` - Updated ${new Date(asOf).toLocaleTimeString()}` : ''}
         </Text>
+      </View>
+
+      <View style={styles.simpleModeCard}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.healthTitle}>Simple Mode</Text>
+          <Text style={styles.simpleModeBadge}>On</Text>
+        </View>
+        <Text style={styles.healthMeta}>
+          Demo and real use the same rules. Top suggestions stay visible here.
+        </Text>
+      </View>
+
+      <View style={styles.healthCard}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.healthTitle}>Top Suggestions</Text>
+          <Text style={styles.healthMeta}>{topSuggestions.length} ready</Text>
+        </View>
+        {topSuggestions.length ? (
+          <View style={styles.suggestionList}>
+            {topSuggestions.map(({ symbol, signal }) => (
+              <View key={symbol} style={styles.suggestionRow}>
+                <View style={styles.suggestionSymbolBox}>
+                  <Text style={styles.suggestionSymbol}>{symbol.replace('USDT', '')}</Text>
+                  <Text style={styles.suggestionMeta}>
+                    {signal.type} {signal.confidence}
+                    {signal.grade ? ` • ${signal.grade}` : ''}
+                  </Text>
+                </View>
+                <View style={styles.suggestionPriceBox}>
+                  <Text style={styles.suggestionPrice}>${formatPrice(signal.entryPrice)}</Text>
+                  <Text style={styles.suggestionMeta}>
+                    TP ${formatPrice(signal.takeProfit)} | SL ${formatPrice(signal.stopLoss)}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.healthMeta}>Waiting for signals...</Text>
+        )}
       </View>
 
       {!easyModeEnabled && <View style={styles.quickCard}>
@@ -770,6 +818,24 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 12,
   },
+  simpleModeCard: {
+    backgroundColor: '#0B1226',
+    borderColor: '#1F2937',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    gap: 8,
+  },
+  simpleModeBadge: {
+    color: '#F8FAFC',
+    backgroundColor: '#1D4ED8',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    overflow: 'hidden',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   card: {
     backgroundColor: '#111827',
     borderColor: '#1F2937',
@@ -983,6 +1049,36 @@ const styles = StyleSheet.create({
   healthAlertText: {
     color: '#FBBF24',
     fontSize: 12,
+  },
+  suggestionList: {
+    gap: 10,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 4,
+  },
+  suggestionSymbolBox: {
+    flex: 1,
+  },
+  suggestionSymbol: {
+    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  suggestionMeta: {
+    color: '#94A3B8',
+    fontSize: 11,
+  },
+  suggestionPriceBox: {
+    alignItems: 'flex-end',
+  },
+  suggestionPrice: {
+    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '700',
   },
   tradeButton: {
     borderRadius: 10,

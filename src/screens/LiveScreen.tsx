@@ -97,7 +97,7 @@ export const LiveScreen = () => {
   const [topMovers, setTopMovers] = useState<
     Array<{ symbol: string; change: number; lastPrice: number }>
   >([]);
-  const [chartMode, setChartMode] = useState<'line' | 'candles'>('line');
+  const [chartMode, setChartMode] = useState<'line' | 'candles'>('candles');
   const [candles, setCandles] = useState<
     Array<{ open: number; high: number; low: number; close: number }>
   >([]);
@@ -176,12 +176,6 @@ export const LiveScreen = () => {
       stream.close();
     };
   }, [symbol]);
-
-  useEffect(() => {
-    if (liteMode) {
-      setChartMode('line');
-    }
-  }, [liteMode]);
 
   useEffect(() => {
     let active = true;
@@ -575,10 +569,13 @@ export const LiveScreen = () => {
           symbols,
           riskPerTrade,
           maxTradesPerDay,
+          dailyTradeLimit: 1,
           minAlignmentScore,
           requireConfirmations,
           autoPauseVolatility,
           maxAtrPercent,
+          stopLossMultiplier: 1,
+          takeProfitMultiplier: 1.1,
           tradeHoursEnabled,
           tradeStartHour,
           tradeEndHour,
@@ -665,6 +662,35 @@ export const LiveScreen = () => {
       <View style={styles.priceCard}>
         <Text style={styles.priceLabel}>{symbol.replace('USDT', '')} / USDT</Text>
         <Text style={styles.priceValue}>{price ? `$${formatPrice(price)}` : '--'}</Text>
+        {signal ? (
+          <View style={styles.simpleSignalBox}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.simpleSignalLabel}>Suggestion</Text>
+              <Text
+                style={[
+                  styles.simpleSignalBadge,
+                  signal.type === 'BUY'
+                    ? styles.simpleSignalBadgeBuy
+                    : signal.type === 'SELL'
+                    ? styles.simpleSignalBadgeSell
+                    : styles.simpleSignalBadgeNeutral,
+                ]}
+              >
+                {signal.type} {signal.confidence}
+              </Text>
+            </View>
+            <Text style={styles.helperText}>{signal.marketSummary}</Text>
+            <Text style={styles.helperText}>
+              Entry ${signal.entryPrice.toFixed(2)} | SL ${signal.stopLoss.toFixed(2)} | TP{' '}
+              {signal.takeProfit.toFixed(2)}
+            </Text>
+            {signal.type !== 'HOLD' ? (
+              <Pressable style={styles.applyButton} onPress={applySuggestion}>
+                <Text style={styles.applyButtonText}>Use Suggestion</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
         {!liteMode && (
           <View style={styles.directionRow}>
             <Pressable
@@ -931,7 +957,8 @@ export const LiveScreen = () => {
         <View style={styles.autoCard}>
         <Text style={styles.sectionTitle}>Auto Trade</Text>
         <Text style={styles.helperText}>
-          Auto trade uses the server worker and runs even when your phone is closed.
+          Auto trade uses the server worker and runs even when your phone is closed. Daily mode is
+          tuned for smaller, steadier targets.
         </Text>
         <Pressable
           style={[styles.directionButton, useWatchlist ? styles.buyButton : styles.sellButton]}
@@ -1111,6 +1138,43 @@ const styles = StyleSheet.create({
   helperText: {
     color: '#94A3B8',
     fontSize: 12,
+  },
+  simpleSignalBox: {
+    backgroundColor: '#0F172A',
+    borderColor: '#1F2937',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  simpleSignalLabel: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  rowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  simpleSignalBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    color: '#F8FAFC',
+    fontSize: 11,
+    fontWeight: '700',
+    overflow: 'hidden',
+  },
+  simpleSignalBadgeBuy: {
+    backgroundColor: '#14532D',
+  },
+  simpleSignalBadgeSell: {
+    backgroundColor: '#7F1D1D',
+  },
+  simpleSignalBadgeNeutral: {
+    backgroundColor: '#334155',
   },
   applyButton: {
     backgroundColor: '#1D4ED8',

@@ -213,10 +213,13 @@ export const SettingsScreen = () => {
         symbols: autoSymbols,
         riskPerTrade,
         maxTradesPerDay,
+        dailyTradeLimit: 1,
         minAlignmentScore,
         requireConfirmations,
         autoPauseVolatility,
         maxAtrPercent,
+        stopLossMultiplier: 1,
+        takeProfitMultiplier: 1.1,
         tradeHoursEnabled,
         tradeStartHour,
         tradeEndHour,
@@ -760,6 +763,7 @@ export const SettingsScreen = () => {
         <Text style={styles.sectionTitle}>Auto Trade</Text>
         <Text style={styles.sectionDescription}>
           Runs on a free server so it keeps trading even when your phone is closed. Testnet only.
+          Daily mode keeps trades smaller and more controlled.
         </Text>
 
         <TextInput
